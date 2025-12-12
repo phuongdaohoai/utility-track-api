@@ -22,19 +22,30 @@ export class ServiceUsageHistory extends BaseEntity {
     nullable: true,
     default: () => "getdate()",
   })
-  timestamp: Date | null;
+  checkInTime: Date | null;
+
+  @Column("datetime", { name: "CheckOutTime", nullable: true })
+  checkOutTime: Date | null;
+
+  @Column("int", { name: "Quantity", default: 1 })
+  quantity: number;
+
+  @Column("decimal", { name: "TotalAmount", precision: 18, scale: 2, default: 0 })
+  totalAmount: number;
 
   @Column("nvarchar", { name: "AdditionalGuests", nullable: true })
   additionalGuests: string | null;
 
+
   @ManyToOne(() => Services, (services) => services.serviceUsageHistories, {
-    onDelete: "CASCADE",
+    onDelete: "NO ACTION", 
   })
   @JoinColumn([{ name: "ServiceId", referencedColumnName: "serviceId" }])
   service: Services;
+  // ------------------------
 
   @ManyToOne(() => Residents, (residents) => residents.serviceUsageHistories, {
-    onDelete: "SET NULL",
+    onDelete: "SET NULL", 
   })
   @JoinColumn([{ name: "ResidentId", referencedColumnName: "residentId" }])
   resident: Residents;

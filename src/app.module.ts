@@ -7,6 +7,7 @@ import { ResidentsModule } from './residents/residents.module';
 import { StaffModule } from './staff/staff.module';
 import { ServicesUsedModule } from './services-used/services-used.module';
 import { AuthModule } from './auth/auth.module';
+import { ServiceUsageModule } from './history/service-usage.module';
 
 @Module({
   imports: [
@@ -31,7 +32,8 @@ import { AuthModule } from './auth/auth.module';
     StaffModule,
     ServicesUsedModule,
     ServicesUsedModule,
-    AuthModule
+    AuthModule,
+    ServiceUsageModule
   ],
   controllers: [AppController],
   providers: [AppService],
