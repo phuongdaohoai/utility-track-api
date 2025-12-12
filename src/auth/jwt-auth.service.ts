@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { Staff } from 'src/entities/entities/staff.entity';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class JwtAuthService{
@@ -24,7 +25,7 @@ export class JwtAuthService{
             fullname: userLogin.fullName,
             permissions:permissions,
 
-            sub:userLogin.userId,
+            sub: userLogin.staffId,
             jti:crypto.randomUUID(),
             iat: Math.floor(Date.now()/1000),
         };
