@@ -6,10 +6,11 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 import { ServiceUsageHistory } from "./service-usage-history.entity";
+import { BaseEntity } from "./base.entity";
 
 @Index("PK__Services__C51BB00A5C40BF2D", ["serviceId"], { unique: true })
 @Entity("Services", { schema: "dbo" })
-export class Services {
+export class Services extends BaseEntity {
   @PrimaryGeneratedColumn({ type: "int", name: "ServiceId" })
   serviceId: number;
 

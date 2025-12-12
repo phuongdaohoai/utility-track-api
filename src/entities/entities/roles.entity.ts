@@ -9,11 +9,12 @@ import {
 } from "typeorm";
 import { Permissions } from "./permissions.entity";
 import { Staff } from "./staff.entity";
+import { BaseEntity } from "./base.entity";
 
 @Index("PK__Roles__8AFACE1AB26D054D", ["roleId"], { unique: true })
 @Index("UQ__Roles__8A2B61602ED56133", ["roleName"], { unique: true })
 @Entity("Roles", { schema: "dbo" })
-export class Roles {
+export class Roles extends BaseEntity {
   @PrimaryGeneratedColumn({ type: "int", name: "RoleId" })
   roleId: number;
 
