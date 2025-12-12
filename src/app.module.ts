@@ -23,7 +23,8 @@ import { ServiceUsageModule } from './history/service-usage.module';
       database: process.env.DB_DATABASE,
       
       extra:{
-        trustServerCertificate: true
+        trustServerCertificate: true,
+        timezone: '+07:00',
       },
 
       autoLoadEntities: true,
