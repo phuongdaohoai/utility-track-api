@@ -22,7 +22,8 @@ import { AuthModule } from './auth/auth.module';
       database: process.env.DB_DATABASE,
       
       extra:{
-        trustServerCertificate: true
+        trustServerCertificate: true,
+        timezone: '+07:00',
       },
 
       autoLoadEntities: true,

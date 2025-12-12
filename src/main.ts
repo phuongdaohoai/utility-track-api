@@ -2,11 +2,19 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
+import { DateTimezoneInterceptor } from './common/interceptors/date-timezone.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { cors: true });
 
-  app.useGlobalPipes(new ValidationPipe({ transform: true }));
+  app.useGlobalInterceptors(new DateTimezoneInterceptor());
+
+  app.useStaticAssets(join(__dirname, '..', 'public/avatars'), {
+    prefix: '/avatars/', // URL: http://localhost:3000/avatars/xxx.jpg
+  });
+
 
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
@@ -19,7 +27,6 @@ async function bootstrap() {
     .setTitle('NestJS SQL Server API')
     .setDescription('API Documentation')
     .setVersion('1.0')
-    .addServer(process.env.PORT!)
     .addBearerAuth(
       {
         type: 'http',

@@ -27,6 +27,7 @@ export class ServicesUsedService {
         const items = await qb
             .skip((page - 1) * pageSize)
             .take(pageSize)
+            .orderBy('service.serviceId', 'DESC')
             .getMany();
 
         return {
