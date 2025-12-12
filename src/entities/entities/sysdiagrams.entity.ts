@@ -1,9 +1,10 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn } from "typeorm";
+import { BaseEntity } from "./base.entity";
 
 @Index("PK__sysdiagr__C2B05B61ED189560", ["diagramId"], { unique: true })
 @Index("UK_principal_name", ["principalId", "name"], { unique: true })
 @Entity("sysdiagrams", { schema: "dbo" })
-export class Sysdiagrams {
+export class Sysdiagrams extends BaseEntity {
   @Column("nvarchar", { name: "name", unique: true, length: 128 })
   name: string;
 

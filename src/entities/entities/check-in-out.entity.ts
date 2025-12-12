@@ -8,10 +8,11 @@ import {
 } from "typeorm";
 import { Residents } from "./residents.entity";
 import { Staff } from "./staff.entity";
+import { BaseEntity } from "./base.entity";
 
 @Index("PK__CheckInO__3214EC072928C9CC", ["id"], { unique: true })
 @Entity("CheckInOut", { schema: "dbo" })
-export class CheckInOut {
+export class CheckInOut  extends BaseEntity{
   @PrimaryGeneratedColumn({ type: "int", name: "Id" })
   id: number;
 

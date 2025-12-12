@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import { Staff } from 'src/entities/entities/staff.entity';
 
 @Injectable()
 export class JwtAuthService{
@@ -17,11 +18,11 @@ export class JwtAuthService{
 
     generateToken(userLogin:any,role:string,permissions:string[]){
         const payload:any={
-            UserId: userLogin.userId,
-            Email: userLogin.email,
-            Role: role,
-            Fullname: userLogin.fullName,
-            Permissions:permissions,
+            staffId: userLogin.staffId,
+            email: userLogin.email,
+            role: role,
+            fullname: userLogin.fullName,
+            permissions:permissions,
 
             sub:userLogin.userId,
             jti:crypto.randomUUID(),

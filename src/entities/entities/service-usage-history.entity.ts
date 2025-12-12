@@ -9,10 +9,11 @@ import {
 import { Services } from "./services.entity";
 import { Residents } from "./residents.entity";
 import { Staff } from "./staff.entity";
+import { BaseEntity } from "./base.entity";
 
 @Index("PK__ServiceU__29B1972013734547", ["usageId"], { unique: true })
 @Entity("ServiceUsageHistory", { schema: "dbo" })
-export class ServiceUsageHistory {
+export class ServiceUsageHistory extends BaseEntity {
   @PrimaryGeneratedColumn({ type: "int", name: "UsageId" })
   usageId: number;
 

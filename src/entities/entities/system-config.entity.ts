@@ -1,8 +1,9 @@
 import { Column, Entity, Index } from "typeorm";
+import { BaseEntity } from "./base.entity";
 
 @Index("PK__SystemCo__C41E028819221E25", ["key"], { unique: true })
 @Entity("SystemConfig", { schema: "dbo" })
-export class SystemConfig {
+export class SystemConfig extends BaseEntity {
   @Column("varchar", { primary: true, name: "Key", length: 50 })
   key: string;
 

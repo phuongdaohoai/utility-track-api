@@ -6,10 +6,11 @@ import {
   PrimaryGeneratedColumn,
 } from "typeorm";
 import { Residents } from "./residents.entity";
+import { BaseEntity } from "./base.entity";
 
 @Index("PK__Apartmen__CBDF5764E15EA026", ["apartmentId"], { unique: true })
 @Entity("Apartments", { schema: "dbo" })
-export class Apartments {
+export class Apartments extends BaseEntity {
   @PrimaryGeneratedColumn({ type: "int", name: "ApartmentId" })
   apartmentId: number;
 
