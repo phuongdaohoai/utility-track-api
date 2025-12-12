@@ -11,6 +11,7 @@ import {
     Length,
     Min,
     Max,
+    IsDateString,
 } from 'class-validator';
 
 export class UpdateStaffDto {
@@ -50,4 +51,12 @@ export class UpdateStaffDto {
     @IsNotEmpty({ message: 'Vui lòng chọn vai trò' })
     @IsNumber()
     roleId: number;
+
+    @ApiProperty({
+        example: "2025-04-05T10:30:45.123Z",
+        description: "Thời gian updatedAt hiện tại mà client đang thấy. Dùng để tránh xung đột chỉnh sửa"
+    })
+    @IsNotEmpty({ message: "updatedAt là bắt buộc khi cập nhật" })
+    @IsDateString()
+    updatedAt: string | Date;
 }

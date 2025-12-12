@@ -63,67 +63,79 @@ export class StaffService {
     }
 
     async create(dto: CreateStaffDto, file: Express.Multer.File | undefined, userId: number) {
-        const existEmail = await this.repo.findOne({
-            where: {
-                email: dto.email,
-            }
-        });
+        try {
+            const existEmail = await this.repo.findOne({
+                where: {
+                    email: dto.email,
+                }
+            });
 
-        if (existEmail) {
-            throw new BadRequestException("Email đã tồn tại");
-        }
-
-        const existPhone = await this.repo.findOne({
-            where: {
-                phone: dto.phone,
-            }
-        });
-
-        if (existPhone) {
-            throw new BadRequestException("Số điện thoại đã tồn tại");
-        }
-
-        const defaultPassword = dto.phone;
-        const passwordHash = await PasswordHelper.hassPassword(defaultPassword);
-
-        //xử lý ảnh
-        let avatarUrl: string | null = null;
-
-        // CHỈ LƯU FILE KHI ĐÃ QUA VALIDATE
-        if (file) {
-            const randomName = Array(32)
-                .fill(null)
-                .map(() => Math.round(Math.random() * 16).toString(16))
-                .join('');
-            const ext = file.originalname.split('.').pop()?.toLowerCase() || 'jpg';
-            const filename = `${randomName}.${ext}`;
-
-            const rootPath = process.cwd(); // lấy root project (luôn đúng dù ở dist hay src)
-            const filePath = join(rootPath, 'public', 'avatars', filename);
-
-            // TỰ ĐỘNG TẠO THƯ MỤC NẾU CHƯA CÓ
-            const dir = join(rootPath, 'public', 'avatars');
-            if (!existsSync(dir)) {
-                mkdirSync(dir, { recursive: true });
+            if (existEmail) {
+                throw new BadRequestException("Email đã tồn tại");
             }
 
-            writeFileSync(filePath, file.buffer);
+            const existPhone = await this.repo.findOne({
+                where: {
+                    phone: dto.phone,
+                }
+            });
 
-            avatarUrl = `/avatars/${filename}`;
+            if (existPhone) {
+                throw new BadRequestException("Số điện thoại đã tồn tại");
+            }
+
+            const defaultPassword = dto.phone;
+            const passwordHash = await PasswordHelper.hassPassword(defaultPassword);
+
+            //xử lý ảnh
+            let avatarUrl: string | null = null;
+
+            // CHỈ LƯU FILE KHI ĐÃ QUA VALIDATE
+            if (file) {
+                const randomName = Array(32)
+                    .fill(null)
+                    .map(() => Math.round(Math.random() * 16).toString(16))
+                    .join('');
+                const ext = file.originalname.split('.').pop()?.toLowerCase() || 'jpg';
+                const filename = `${randomName}.${ext}`;
+
+                const rootPath = process.cwd(); // lấy root project (luôn đúng dù ở dist hay src)
+                const filePath = join(rootPath, 'public', 'avatars', filename);
+
+                // TỰ ĐỘNG TẠO THƯ MỤC NẾU CHƯA CÓ
+                const dir = join(rootPath, 'public', 'avatars');
+                if (!existsSync(dir)) {
+                    mkdirSync(dir, { recursive: true });
+                }
+
+                writeFileSync(filePath, file.buffer);
+
+                avatarUrl = `/avatars/${filename}`;
+            }
+
+
+            const staff = this.repo.create({
+                ...dto,
+                fullName: dto.fullName,
+                passwordHash,
+                avatar: avatarUrl,
+                createdBy: userId,
+                updatedBy: userId
+            })
+
+            const saved = await this.repo.save(staff);
+            return ApiResponse.ok(saved, "Thêm Nhân Viên Thành Công");
+        } catch (error) {
+            // BẮT LỖI UNIQUE VIOLATION TỪ SQL SERVER (nếu có trường hợp lọt)
+            if (error.code === '23505' || // PostgreSQL unique violation
+                error.message.includes('Violation of UNIQUE KEY') || // SQL Server
+                error.message.includes('duplicate key')) {
+                throw new BadRequestException('Email đã tồn tại');
+            }
+
+            // Các lỗi khác thì throw lại
+            throw error;
         }
-
-
-        const staff = this.repo.create({
-            ...dto,
-            fullName: dto.fullName,
-            passwordHash,
-            avatar: avatarUrl,
-            createdBy: userId,
-            updatedBy: userId
-        })
-
-        const saved = await this.repo.save(staff);
-        return ApiResponse.ok(saved, "Thêm Nhân Viên Thành Công");
     }
 
     async update(staffId: number, dto: UpdateStaffDto, file: Express.Multer.File | undefined, userId: number) {
@@ -142,6 +154,15 @@ export class StaffService {
             if (existEmail) {
                 throw new BadRequestException('Email đã được sử dụng bởi nhân viên khác');
             }
+        }
+
+        const clientUpdatedAt = new Date(dto.updatedAt).getTime();
+        const serverUpdatedAt = new Date(staff.updatedAt).getTime();
+
+        if (clientUpdatedAt !== serverUpdatedAt) {
+            throw new ConflictException(
+                "Dịch vụ đã được chỉnh sửa bởi người khác. Vui lòng tải lại dữ liệu mới nhất và thử lại!"
+            );
         }
 
         let avatarUrl = staff.avatar;
@@ -201,7 +222,8 @@ export class StaffService {
         staff.updatedBy = userId;
         staff.status = 0;
 
-        const result  = await this.repo.softRemove(staff);
+        const result = await this.repo.softRemove(staff);
         return ApiResponse.ok(result, "Xóa Nhân Viên Thành Công");
     }
 }
+
