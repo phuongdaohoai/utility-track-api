@@ -54,14 +54,14 @@ export class StaffService {
         };
     }
     async findOne(id: number) {
-        const staff = await this.repo.findOne({ 
+        const staff = await this.repo.findOne({
             where: { id: id },
-            relations:{
+            relations: {
                 role: {
                     permissions: true
                 }
             },
-            select:{
+            select: {
                 id: true,
                 fullName: true,
                 email: true,
@@ -71,19 +71,19 @@ export class StaffService {
                 version: true,
                 createdAt: true,
                 updatedAt: true,
-                role:{
-                    id:true,
-                    roleName:true
+                role: {
+                    id: true,
+                    roleName: true
                 }
             }
-         });
+        });
 
         if (!staff) throw new NotFoundException("Không tìm thấy nhân viên");
         return staff;
     }
 
     async findById(id: number) {
-        const staff= await this.findOne(id);
+        const staff = await this.findOne(id);
         console.log(staff);
         return staff;
     }
@@ -145,6 +145,8 @@ export class StaffService {
                 fullName: dto.fullName,
                 passwordHash,
                 avatar: avatarUrl,
+                role: { id: dto.roleId } as any,
+                status: 1,
                 createdBy: userId,
                 updatedBy: userId
             })
@@ -177,7 +179,7 @@ export class StaffService {
         }
 
         if (dto.phone && dto.phone !== staff.phone) {
-            const existPhone = await this.repo.findOne({ where: { phone: dto.phone } });
+            const existPhone = await this.repo.findOne({ where: { phone: dto.phone , id : Not(staffId)} });
             if (existPhone) {
                 throw new BadRequestException('Số điện thoại đã được sử dụng bởi nhân viên khác');
             }
@@ -185,7 +187,7 @@ export class StaffService {
 
         // Kiểm tra trùng email mới (nếu thay đổi)
         if (dto.email && dto.email !== staff.email) {
-            const existEmail = await this.repo.findOne({ where: { email: dto.email } });
+            const existEmail = await this.repo.findOne({ where: { email: dto.email, id: Not(staffId) } });
             if (existEmail) {
                 throw new BadRequestException('Email đã được sử dụng bởi nhân viên khác');
             }
@@ -228,22 +230,42 @@ export class StaffService {
         });
 
         return await this.repo.save(staff);
-      
+
     }
 
     async remove(id: number, userId: number) {
-        const staff = await this.findOne(id);
 
-        if (staff.id == 1) {
-            throw new BadRequestException("Không thể xóa tài khoản SuperAdmin")
+        const staff = await this.repo.findOne({
+            where: { id },
+            relations: { role: true },
+            withDeleted: false, // chỉ lấy chưa soft delete
+        });
+
+        if (!staff) {
+            throw new NotFoundException('Không tìm thấy nhân viên');
         }
-        if (staff.status === BASE_STATUS.INACTIVE || staff.deletedAt != null) {
-            throw new ConflictException("Nhân viên này đã bị xóa trước đó");
+
+        if (staff.id === userId) {
+            throw new BadRequestException('Bạn không thể tự xóa tài khoản của chính mình');
         }
+
+        if (staff.id === 1) {
+            throw new BadRequestException('Không thể xóa tài khoản Super Administrator');
+        }
+
+        if (staff.role?.roleName === 'SuperAdmin') {
+            throw new BadRequestException('Không thể xóa tài khoản có vai trò Super Administrator');
+        }
+
+        if (staff.status === BASE_STATUS.INACTIVE || staff.deletedAt !== undefined) {
+            throw new ConflictException('Nhân viên này đã bị xóa trước đó');
+        }
+
+        // 6. Thực hiện soft delete
         staff.deletedAt = new Date();
         staff.updatedBy = userId;
         staff.status = BASE_STATUS.INACTIVE;
-
+``
         return await this.repo.softRemove(staff);
     }
 }

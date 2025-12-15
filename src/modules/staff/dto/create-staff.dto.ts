@@ -1,5 +1,6 @@
 // dto/create-staff.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
     IsEmail,
     IsNotEmpty,
@@ -41,5 +42,6 @@ export class CreateStaffDto {
     @ApiProperty({ example: 3, description: 'Vai trò: 1=Admin, 2=Quản lý, 3=Lễ tân, 4=Bảo vệ...' })
     @IsNotEmpty({ message: 'Vui lòng chọn vai trò' })
     @IsNumber()
+    @Type(() => Number)
     roleId: number;
 }

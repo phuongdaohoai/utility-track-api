@@ -8,6 +8,8 @@ import { StaffModule } from './modules/staff/staff.module';
 import { ServicesUsedModule } from './modules/services-used/services-used.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ServiceUsageModule } from './modules/history/service-usage.module';
+import { RolesModule } from './modules/roles/roles.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -33,7 +35,9 @@ import { ServiceUsageModule } from './modules/history/service-usage.module';
     StaffModule,
     ServicesUsedModule,
     AuthModule,
-    ServiceUsageModule
+    ServiceUsageModule,
+    RolesModule,
+    DashboardModule
   ],
   controllers: [AppController],
   providers: [AppService],
