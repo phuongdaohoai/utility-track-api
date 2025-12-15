@@ -52,4 +52,15 @@ export default class ServiceUsageService {
             totalPages: Math.ceil(total / Number(limitNum)),
         }
     }
+
+    async getDetail(id: number) {
+        const history = await this.repo.findOne({
+            where: { usageId: id },
+            relations: ["resident", "service", "staff"]
+        });
+        if (!history) {
+            throw new Error("Không tìm thấy thông tin cư dân");
+        }
+        return history;
+    }
 }

@@ -1,4 +1,4 @@
-import { Get, Controller, Query, UseGuards } from "@nestjs/common";
+import { Get, Controller, Query, UseGuards, ParseIntPipe, NotFoundException, Param } from "@nestjs/common";
 import ServiceUsageService from "./service-usage.service";
 import { FillerHistoryDto } from "./dto/filter-history.dto";
 import { ApiBearerAuth } from "@nestjs/swagger";
@@ -26,4 +26,18 @@ export class ServiceUsageController {
             return ApiResponse.fail("Lỗi hệ thống, vui lòng thử lại sau");
         }
     }
+    @Get(':id')
+    async getDetail(@Param('id', ParseIntPipe) id: number) {
+        try {
+            const data = await this.serviceUsageService.getDetail(id);
+            return ApiResponse.ok(data, "Lấy chi tiết thành công!");
+        } catch (error) {
+            if (error.status === 404 || error instanceof NotFoundException) {
+                return ApiResponse.fail(`Không tìm thấy cư dân nào có ID là ${id}`);
+            }
+            console.error("Lỗi crash server:", error);
+            return ApiResponse.fail("Lỗi hệ thống, vui lòng thử lại sau");
+        }
+    }
+
 }
