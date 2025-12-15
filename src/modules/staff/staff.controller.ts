@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { StaffService } from './staff.service';
 import { ApiBearerAuth, ApiConsumes, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
@@ -29,42 +29,42 @@ export class StaffController {
     @Permissions('Staff.Create')
     @ApiConsumes('multipart/form-data')
     @UseInterceptors(FileInterceptor('avatar', multerConfig))
-    create(
+    async create(
         @UploadedFile() file: Express.Multer.File,
         @Body() dto: CreateStaffDto,
         @Req() req) {
-        const result= this.service.create(dto, file, req.user.staffId);
+        const result= await this.service.create(dto, file, req.user.staffId);
         return ApiResponse.ok(result, "Thêm nhân viên thành công");
     }
 
     @Get('getById/:staffId')
     @Permissions('Staff.View')
-    getById(
+    async getById(
         @Param('staffId') staffId: number,
         @Req() req) {
-        const result= this.service.findById(+staffId);
+        const result= await this.service.findById(+staffId);
         return ApiResponse.ok(result);
     }
 
-    @Post('update/:staffId')
+    @Put('update/:staffId')
     @Permissions('Staff.Update')
     @ApiConsumes('multipart/form-data')
     @UseInterceptors(FileInterceptor('avatar', multerConfig))
-    update(
+    async update(
         @Param('staffId') staffId: number,
         @UploadedFile() file: Express.Multer.File,
         @Body() dto: UpdateStaffDto,
         @Req() req) {
-        const result=this.service.update(+staffId, dto, file, req.user.staffId);
+        const result=await this.service.update(+staffId, dto, file, req.user.staffId);
         return ApiResponse.ok(result,"Cập nhật nhân viên thành công");
     }
 
     @Delete('delete/:staffId')
     @Permissions('Staff.Delete')
-    delete(
+    async delete(
         @Param('staffId') staffId: number,
         @Req() req) {
-        const result=this.service.remove(+staffId, req.user.staffId);
+        const result=await this.service.remove(+staffId, req.user.staffId);
         return ApiResponse.ok(result,"Xóa nhân viên thành công");
     }
 }

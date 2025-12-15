@@ -47,16 +47,13 @@ export class UpdateStaffDto {
     @IsUrl({}, { message: 'Avatar phải là link hợp lệ' })
     avatar?: string;
 
-    @ApiProperty({ example: 3, description: 'Vai trò: 1=Admin, 2=Quản lý, 3=Lễ tân, 4=Bảo vệ...' })
+    @ApiProperty({ example: 3, description: 'Vai trò: 1=Admin, 2=Quản lý..' })
     @IsNotEmpty({ message: 'Vui lòng chọn vai trò' })
     @IsNumber()
     roleId: number;
 
-    @ApiProperty({
-        example: "2025-04-05T10:30:45.123Z",
-        description: "Thời gian updatedAt hiện tại mà client đang thấy. Dùng để tránh xung đột chỉnh sửa"
-    })
-    @IsNotEmpty({ message: "updatedAt là bắt buộc khi cập nhật" })
-    @IsDateString()
-    updatedAt: string | Date;
+
+    @ApiProperty()
+    version: number;
+
 }

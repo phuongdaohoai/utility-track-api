@@ -16,6 +16,6 @@ export abstract class BaseEntity {
     @Column("int", { name: "updated_by", nullable: true, select: false })
     updatedBy: number | null;
 
-    @VersionColumn()
+    @VersionColumn({ default: 1 })
     version: number;
 }
