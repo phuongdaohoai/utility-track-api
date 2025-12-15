@@ -23,7 +23,7 @@ export class StaffService {
         const page = filter.page ?? 1;
         const pageSize = filter.pageSize ?? 10;
 
-        const qb = this.repo.createQueryBuilder('staff');
+        const qb = this.repo.createQueryBuilder('staff').leftJoin('staff.role', 'role').addSelect(['role.roleName']);
 
         if (filter.search?.trim()) {
             const search = filter.search.trim();
