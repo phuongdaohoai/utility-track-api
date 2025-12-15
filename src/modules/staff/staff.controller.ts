@@ -1,9 +1,9 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { StaffService } from './staff.service';
 import { ApiBearerAuth, ApiConsumes, ApiOperation } from '@nestjs/swagger';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { PermissionsGuard } from 'src/auth/guards/permissions.guard';
-import { Permissions } from 'src/auth/decorators/permissions.decorator';
+import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from 'src/modules/auth/guards/permissions.guard';
+import { Permissions } from 'src/modules/auth/decorators/permissions.decorator';
 import { FilterStaffDto } from './dto/filter-staff.dto';
 import { ApiResponse } from 'src/common/response.dto';
 import { FileInterceptor } from '@nestjs/platform-express';

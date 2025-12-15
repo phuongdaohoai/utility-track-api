@@ -1,9 +1,9 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { ServicesUsedService } from './services-used.service';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { PermissionsGuard } from 'src/auth/guards/permissions.guard';
+import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from 'src/modules/auth/guards/permissions.guard';
 import { ApiBearerAuth } from '@nestjs/swagger';
-import { Permissions } from 'src/auth/decorators/permissions.decorator';
+import { Permissions } from 'src/modules/auth/decorators/permissions.decorator';
 import { permission } from 'process';
 import { FilterServiceDto } from './dto/filter-service.dto';
 import { ApiResponse } from 'src/common/response.dto';
