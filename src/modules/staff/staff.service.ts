@@ -13,6 +13,7 @@ import { join } from 'path';
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
 import { Staffs } from 'src/entities/staffs.entity';
 import { BASE_STATUS } from 'src/common/constants/base-status.constant';
+import { log } from 'console';
 @Injectable()
 export class StaffService {
     constructor(
@@ -53,13 +54,38 @@ export class StaffService {
         };
     }
     async findOne(id: number) {
-        const staff = await this.repo.findOne({ where: { id: id } });
+        const staff = await this.repo.findOne({ 
+            where: { id: id },
+            relations:{
+                role: {
+                    permissions: true
+                }
+            },
+            select:{
+                id: true,
+                fullName: true,
+                email: true,
+                phone: true,
+                avatar: true,
+                status: true,
+                version: true,
+                createdAt: true,
+                updatedAt: true,
+                role:{
+                    id:true,
+                    roleName:true
+                }
+            }
+         });
+
         if (!staff) throw new NotFoundException("Không tìm thấy nhân viên");
         return staff;
     }
 
     async findById(id: number) {
-        return await this.findOne(id);
+        const staff= await this.findOne(id);
+        console.log(staff);
+        return staff;
     }
 
     async create(dto: CreateStaffDto, file: Express.Multer.File | undefined, userId: number) {
@@ -140,6 +166,16 @@ export class StaffService {
     async update(staffId: number, dto: UpdateStaffDto, file: Express.Multer.File | undefined, userId: number) {
         const staff = await this.findOne(staffId);
 
+        if (!staff) {
+            throw new NotFoundException("Không tìm thấy nhân viên");
+        }
+
+        if (dto.version !== staff.version) {
+            throw new ConflictException(
+                'Dữ liệu đã được cập nhật bởi người khác. Vui lòng tải lại dữ liệu mới nhất!'
+            );
+        }
+
         if (dto.phone && dto.phone !== staff.phone) {
             const existPhone = await this.repo.findOne({ where: { phone: dto.phone } });
             if (existPhone) {
@@ -155,14 +191,7 @@ export class StaffService {
             }
         }
 
-        const clientUpdatedAt = new Date(dto.updatedAt).getTime();
-        const serverUpdatedAt = new Date(staff.updatedAt).getTime();
 
-        if (clientUpdatedAt !== serverUpdatedAt) {
-            throw new ConflictException(
-                "Dịch vụ đã được chỉnh sửa bởi người khác. Vui lòng tải lại dữ liệu mới nhất và thử lại!"
-            );
-        }
 
         let avatarUrl = staff.avatar;
         if (file) {

@@ -66,22 +66,19 @@ export class ServicesUsedService {
     }
 
     async update(id: number, dto: UpdateServiceDto, userId: number) {
-        let service: Services | null;
-        try {
-            service = await this.repo
-                .createQueryBuilder('service')
-                .where('service.id = :id', { id })
-                .setLock('optimistic', dto.version) // 👈 CHỖ QUYẾT ĐỊNH
-                .getOne();
-        } catch (error) {
-            if (error instanceof OptimisticLockVersionMismatchError) {
-                throw new ConflictException(
-                    'Dữ liệu đã được cập nhật bởi người khác'
-                );
-            }
-            throw error;
+        const service = await this.repo.findOne({
+            where: { id }
+        });
+
+        if (!service) {
+            throw new NotFoundException("Không tìm thấy dịch vụ");
         }
 
+        if (dto.version !== service.version) {
+            throw new ConflictException(
+                'Dữ liệu đã được cập nhật bởi người khác. Vui lòng tải lại dữ liệu mới nhất!'
+            );
+        }
         if (!service) throw new NotFoundException("không tìm thấy dịch vụ");
 
         if (dto.serviceName) {
