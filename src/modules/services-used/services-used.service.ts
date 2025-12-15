@@ -109,7 +109,7 @@ export class ServicesUsedService {
         const service = await this.findOne(id);
         if (!service) throw new NotFoundException("không tìm thấy dịch vụ");
 
-        if (service.status === BASE_STATUS.INACTIVE || service.deletedAt != null) {
+        if (service.status === BASE_STATUS.INACTIVE || service.deletedAt !== undefined) {
             throw new ConflictException("Dịch vụ này đã bị xóa trước đó");
         }
         service.deletedAt = new Date();

@@ -1,6 +1,5 @@
 // dto/create-staff.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import {
     IsEmail,
     IsNotEmpty,
@@ -13,9 +12,13 @@ import {
     Min,
     Max,
     IsDateString,
+    Matches,
+    IsEnum,
 } from 'class-validator';
+import { GenderEnum } from './create-resident.dto';
+import { Type } from 'class-transformer';
 
-export class UpdateStaffDto {
+export class UpdateResidentDto {
     @ApiProperty({ example: 'Nguyễn Thị Hương', description: 'Họ và tên nhân viên' })
     @IsNotEmpty({ message: 'Họ tên không được để trống' })
     @IsString()
@@ -32,6 +35,25 @@ export class UpdateStaffDto {
     @IsEmail({}, { message: 'Email không hợp lệ' })
     email?: string;
 
+    @ApiProperty({ example: '097387928104', description: 'CCCD 12 số' })
+    @IsNotEmpty()
+    @Matches(/^\d{12}$/, { message: 'CCCD phải 12 chữ số' })
+    citizenCard: string;
+
+    @ApiProperty({ enum: GenderEnum })
+    @IsEnum(GenderEnum, { message: 'Giới tính không hợp lệ' })
+    gender: GenderEnum;
+
+    @ApiProperty({ example: '2000-05-12' })
+    @IsDateString({}, { message: 'Ngày sinh không hợp lệ' })
+    birthday: string;
+
+    @ApiProperty({ example: 3, required: false })
+    @IsOptional()
+    @IsNumber()
+    @Type(() => Number)
+    apartmentId?: number;
+
     @ApiProperty({ example: 1, description: 'Trạng thái: 1 = hoạt động, 0 = khóa', enum: [0, 1] })
     @IsNotEmpty()
     @IsNumber()
@@ -42,22 +64,14 @@ export class UpdateStaffDto {
     @ApiProperty({
         type: 'string',
         format: 'binary',
-        description: 'Ảnh đại diện nhân viên (jpg, png, webp, gif - tối đa 5MB)',
+        required: false,
+        description: 'Ảnh đại diện (jpg, png, webp, tối đa 5MB)',
     })
-    @IsOptional()
-    @IsUrl({}, { message: 'Avatar phải là link hợp lệ' })
-    avatar?: string;
-
-    @ApiProperty({ example: 3, description: 'Vai trò: 1=Admin, 2=Quản lý..' })
-    @IsNotEmpty({ message: 'Vui lòng chọn vai trò' })
-    @IsNumber()
-    @Type(() => Number)
-    roleId: number;
+    avatar?: any;
 
 
     @ApiProperty()
     @IsNumber()
-
     @Type(() => Number)
     version: number;
 

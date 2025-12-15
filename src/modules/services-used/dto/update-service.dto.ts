@@ -1,4 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { Type } from "class-transformer";
 import { IsDateString, IsNotEmpty, isNumber, IsNumber, IsOptional, IsString, Max, Min } from "class-validator";
 
 export class UpdateServiceDto {
@@ -33,6 +34,8 @@ export class UpdateServiceDto {
 
   
     @ApiProperty()
+    @IsNumber()
+    @Type(() => Number)
     version: number;
 
 }
