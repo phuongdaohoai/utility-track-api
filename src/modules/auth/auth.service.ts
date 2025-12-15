@@ -1,19 +1,19 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Roles } from 'src/entities/entities/roles.entity';
-import { Staff } from 'src/entities/entities/staff.entity';
+import { Roles } from 'src/entities/roles.entity';
 import { Repository } from 'typeorm';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthService } from './jwt-auth.service';
 import { PasswordHelper } from 'src/helper/password.helper';
+import { Staffs } from 'src/entities/staffs.entity';
 
 @Injectable()
 export class AuthService {
     constructor(
         private readonly jwtAuthService: JwtAuthService,
 
-        @InjectRepository(Staff)
-        private repoStaff: Repository<Staff>,
+        @InjectRepository(Staffs)
+        private repoStaff: Repository<Staffs>,
 
         @InjectRepository(Roles)
         private roleRepo: Repository<Roles>
@@ -36,7 +36,7 @@ export class AuthService {
         }
 
         // 3. Check role
-        const roleId = user.roleId ?? 0;
+        const roleId = user.role.id ?? 0;
         if (roleId === 0) {
             throw new UnauthorizedException("Bạn không có quyền truy cập");
         }
@@ -68,13 +68,18 @@ export class AuthService {
             where: {
                 email: email,
             },
+            relations: {
+                role: true,
+            },
             select: {
-                staffId: true,
+                id: true,
                 fullName: true,
                 phone: true,
                 email: true,
                 passwordHash: true,
-                roleId: true,
+                role: {
+                    id: true,
+                },
             },
         });
     }
@@ -82,11 +87,11 @@ export class AuthService {
     async findRoleByRoleId(roleId: number) {
         return this.roleRepo.findOne({
             where: {
-                roleId: roleId,
+                id: roleId,
 
             },
             select: {
-                roleId: true,
+                id: true,
                 roleName: true,
             },
         });
@@ -94,7 +99,7 @@ export class AuthService {
 
     async getPermissions(roleId: number): Promise<string[]> {
         const role = await this.roleRepo.findOne({
-            where: { roleId },
+            where: { id: roleId },
             relations: ["permissions"],
         });
 

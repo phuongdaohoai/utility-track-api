@@ -3,10 +3,10 @@ import { StaffController } from './staff.controller';
 import { StaffService } from './staff.service';
 import { Type } from 'class-transformer';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Staff } from 'src/entities/entities/staff.entity';
+import { Staffs } from 'src/entities/staffs.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Staff])],
+  imports: [TypeOrmModule.forFeature([Staffs])],
   controllers: [StaffController],
   providers: [StaffService]
 })

@@ -1,16 +1,16 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { FillerHistoryDto } from "./dto/filter-history.dto";
-import { ServiceUsageHistory } from "src/entities/entities/service-usage-history.entity";
 import { Repository } from "typeorm";
 import { Brackets } from 'typeorm';
+import { ServiceUsageHistories } from "src/entities/service-usage-histories.entity";
 
 
 @Injectable()
 export default class ServiceUsageService {
     constructor(
-        @InjectRepository(ServiceUsageHistory)
-        private repo: Repository<ServiceUsageHistory>,
+        @InjectRepository(ServiceUsageHistories)
+        private repo: Repository<ServiceUsageHistories>,
     ) { }
 
     async getHistory(filter: FillerHistoryDto) {
@@ -20,13 +20,13 @@ export default class ServiceUsageService {
             .leftJoinAndSelect("history.resident", "resident")
             .leftJoinAndSelect("history.service", "service")
             .leftJoinAndSelect("history.staff", "staff")
-            .orderBy("history.checkInTime", "DESC");
+            .orderBy("history.usageTime", "DESC");
         // Loc theo ten cu dan  
         if (searchName) {
             query.andWhere(
                 new Brackets((qb) => {
-                    qb.where("resident.FullName LIKE :name", { name: `%${searchName}%` })
-                        .orWhere("service.ServiceName LIKE :name", { name: `%${searchName}%` })
+                    qb.where("resident.fullName LIKE :name", { name: `%${searchName}%` })
+                        .orWhere("service.serviceName LIKE :name", { name: `%${searchName}%` })
                 })
             );
 

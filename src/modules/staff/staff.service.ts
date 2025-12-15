@@ -2,7 +2,6 @@ import { FilterStaffDto } from './dto/filter-staff.dto';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Injector } from '@nestjs/core/injector/injector';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Staff } from 'src/entities/entities/staff.entity';
 import { StaffModule } from './staff.module';
 import { Brackets, Not, Repository } from 'typeorm';
 import { PaginationResult } from 'src/common/pagination.dto';
@@ -12,14 +11,16 @@ import { PasswordHelper } from 'src/helper/password.helper';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { join } from 'path';
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
+import { Staffs } from 'src/entities/staffs.entity';
+import { BASE_STATUS } from 'src/common/constants/base-status.constant';
 @Injectable()
 export class StaffService {
     constructor(
-        @InjectRepository(Staff)
-        private repo: Repository<Staff>
+        @InjectRepository(Staffs)
+        private repo: Repository<Staffs>
     ) { }
 
-    async findAll(filter: FilterStaffDto): Promise<PaginationResult<Staff>> {
+    async findAll(filter: FilterStaffDto): Promise<PaginationResult<Staffs>> {
         const page = filter.page ?? 1;
         const pageSize = filter.pageSize ?? 10;
 
@@ -41,7 +42,7 @@ export class StaffService {
         const items = await qb
             .skip((page - 1) * pageSize)
             .take(pageSize)
-            .orderBy('staff.staffId', 'DESC')
+            .orderBy('staff.id', 'DESC')
             .getMany();
 
         return {
@@ -52,14 +53,13 @@ export class StaffService {
         };
     }
     async findOne(id: number) {
-        const staff = await this.repo.findOne({ where: { staffId: id } });
+        const staff = await this.repo.findOne({ where: { id: id } });
         if (!staff) throw new NotFoundException("Không tìm thấy nhân viên");
         return staff;
     }
 
     async findById(id: number) {
-        const staff = await this.findOne(id);
-        return ApiResponse.ok(staff);
+        return await this.findOne(id);
     }
 
     async create(dto: CreateStaffDto, file: Express.Multer.File | undefined, userId: number) {
@@ -123,8 +123,7 @@ export class StaffService {
                 updatedBy: userId
             })
 
-            const saved = await this.repo.save(staff);
-            return ApiResponse.ok(saved, "Thêm Nhân Viên Thành Công");
+            return await this.repo.save(staff);
         } catch (error) {
             // BẮT LỖI UNIQUE VIOLATION TỪ SQL SERVER (nếu có trường hợp lọt)
             if (error.code === '23505' || // PostgreSQL unique violation
@@ -194,36 +193,29 @@ export class StaffService {
             phone: dto.phone ?? staff.phone,
             email: dto.email ?? staff.email,
             status: dto.status ?? staff.status,
-            roleId: dto.roleId ?? staff.roleId,
+            roleId: dto.roleId ?? staff.role.id,
             avatar: avatarUrl,
             updatedBy: userId,
         });
 
-        const saved = await this.repo.save(staff);
-        return ApiResponse.ok(
-            {
-                ...saved,
-                avatar: avatarUrl ? `http://localhost:3000${avatarUrl}` : null
-            },
-            "Cập nhật nhân viên thành công"
-        );
+        return await this.repo.save(staff);
+      
     }
 
     async remove(id: number, userId: number) {
         const staff = await this.findOne(id);
 
-        if (staff.staffId == 1) {
+        if (staff.id == 1) {
             throw new BadRequestException("Không thể xóa tài khoản SuperAdmin")
         }
-        if (staff.status === 0 || staff.deletedAt != null) {
+        if (staff.status === BASE_STATUS.INACTIVE || staff.deletedAt != null) {
             throw new ConflictException("Nhân viên này đã bị xóa trước đó");
         }
         staff.deletedAt = new Date();
         staff.updatedBy = userId;
-        staff.status = 0;
+        staff.status = BASE_STATUS.INACTIVE;
 
-        const result = await this.repo.softRemove(staff);
-        return ApiResponse.ok(result, "Xóa Nhân Viên Thành Công");
+        return await this.repo.softRemove(staff);
     }
 }
 

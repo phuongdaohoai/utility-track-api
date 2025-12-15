@@ -9,6 +9,7 @@ import { FilterServiceDto } from './dto/filter-service.dto';
 import { ApiResponse } from 'src/common/response.dto';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
+import request from 'supertest';
 
 @Controller('services-used')
 @ApiBearerAuth('Authorization')
@@ -28,25 +29,29 @@ export class ServicesUsedController {
     @Get('getById/:id')
     @Permissions('Services.View')
     async getById(@Param('id') id: number) {
-        return this.service.findById(id);
+        const result= await this.service.findById(id);
+        return ApiResponse.ok(result);
     }
 
     @Post('create')
     @Permissions('Services.Create')
     async create(@Body() dto: CreateServiceDto, @Req() req) {
-        return this.service.create(dto, req.user.staffId);
+        const result = await this.service.create(dto, req.user.staffId);
+        return ApiResponse.ok(result, "Thêm Dịch Vụ Thành Công");
     }
 
     @Put('update/:id')
     @Permissions('Services.Update')
     async update(@Body() dto: UpdateServiceDto, @Req() req, @Param('id') id: number) {
-        return this.service.update(id, dto, req.user.staffId);
+        const result = await this.service.update(id, dto, req.user.staffId);
+        return ApiResponse.ok(result);
     }
 
     @Delete('delete/:id')
     @Permissions('Services.Delete')
     async delete(@Req() req, @Param('id') id: number) {
-        return this.service.remove(id, req.user.staffId);
+        const result = await this.service.remove(id, req.user.staffId);
+        return ApiResponse.ok(result, "Xóa Dịch Vụ Thành Công");
     }
 }
 

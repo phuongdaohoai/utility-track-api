@@ -5,10 +5,10 @@ import { JwtAuthService } from './jwt-auth.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Staff } from 'src/entities/entities/staff.entity';
-import { Roles } from 'src/entities/entities/roles.entity';
-import { Permissions } from 'src/entities/entities/permissions.entity';
 import { PermissionsGuard } from './guards/permissions.guard';
+import { Staffs } from 'src/entities/staffs.entity';
+import { Roles } from 'src/entities/roles.entity';
+import { Permissions } from 'src/entities/permissions.entity';
 
 @Module({
     imports: [
@@ -21,7 +21,7 @@ import { PermissionsGuard } from './guards/permissions.guard';
                 algorithm: 'HS256',
             }
         }),
-        TypeOrmModule.forFeature([Staff,Roles,Permissions])
+        TypeOrmModule.forFeature([Staffs,Roles,Permissions])
     ],
     providers: [JwtAuthService, JwtStrategy, AuthService,PermissionsGuard],
     exports: [

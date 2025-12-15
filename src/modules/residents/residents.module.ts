@@ -2,15 +2,15 @@ import { Module } from '@nestjs/common';
 import { ResidentsController } from './residents.controller';
 import { ResidentsService } from './residents.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Residents } from 'src/entities/entities/residents.entity';
-import { Staff } from 'src/entities/entities/staff.entity';
-import { ServiceUsageHistory } from 'src/entities/entities/service-usage-history.entity';
-import { Services } from 'src/entities/entities/services.entity';
-import { CheckInOut } from 'src/entities/entities/check-in-out.entity';
-import { Apartments } from 'src/entities/entities/apartments.entity';
+import { Residents } from 'src/entities/residents.entity';
+import { CheckInOuts } from 'src/entities/check-in-outs.entity';
+import { Staffs } from 'src/entities/staffs.entity';
+import { ServiceUsageHistories } from 'src/entities/service-usage-histories.entity';
+import { Services } from 'src/entities/services.entity';
+import { Apartments } from 'src/entities/apartments.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Residents, CheckInOut, Staff, ServiceUsageHistory, Services, Apartments])],
+  imports: [TypeOrmModule.forFeature([Residents, CheckInOuts, Staffs, ServiceUsageHistories, Services, Apartments])],
   controllers: [ResidentsController],
   providers: [ResidentsService]
 })

@@ -33,7 +33,8 @@ export class StaffController {
         @UploadedFile() file: Express.Multer.File,
         @Body() dto: CreateStaffDto,
         @Req() req) {
-        return this.service.create(dto, file, req.user.staffId);
+        const result= this.service.create(dto, file, req.user.staffId);
+        return ApiResponse.ok(result, "Thêm nhân viên thành công");
     }
 
     @Get('getById/:staffId')
@@ -41,7 +42,8 @@ export class StaffController {
     getById(
         @Param('staffId') staffId: number,
         @Req() req) {
-        return this.service.findById(+staffId);
+        const result= this.service.findById(+staffId);
+        return ApiResponse.ok(result);
     }
 
     @Post('update/:staffId')
@@ -53,7 +55,8 @@ export class StaffController {
         @UploadedFile() file: Express.Multer.File,
         @Body() dto: UpdateStaffDto,
         @Req() req) {
-        return this.service.update(+staffId, dto, file, req.user.staffId);
+        const result=this.service.update(+staffId, dto, file, req.user.staffId);
+        return ApiResponse.ok(result,"Cập nhật nhân viên thành công");
     }
 
     @Delete('delete/:staffId')
@@ -61,6 +64,7 @@ export class StaffController {
     delete(
         @Param('staffId') staffId: number,
         @Req() req) {
-        return this.service.remove(+staffId, req.user.staffId);
+        const result=this.service.remove(+staffId, req.user.staffId);
+        return ApiResponse.ok(result,"Xóa nhân viên thành công");
     }
 }

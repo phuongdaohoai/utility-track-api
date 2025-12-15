@@ -3,11 +3,11 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
-import { ResidentsModule } from './residents/residents.module';
-import { StaffModule } from './staff/staff.module';
-import { ServicesUsedModule } from './services-used/services-used.module';
-import { AuthModule } from './auth/auth.module';
-import { ServiceUsageModule } from './history/service-usage.module';
+import { ResidentsModule } from './modules/residents/residents.module';
+import { StaffModule } from './modules/staff/staff.module';
+import { ServicesUsedModule } from './modules/services-used/services-used.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { ServiceUsageModule } from './modules/history/service-usage.module';
 
 @Module({
   imports: [
@@ -31,7 +31,6 @@ import { ServiceUsageModule } from './history/service-usage.module';
     }),
     ResidentsModule,
     StaffModule,
-    ServicesUsedModule,
     ServicesUsedModule,
     AuthModule,
     ServiceUsageModule

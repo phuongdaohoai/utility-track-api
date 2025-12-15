@@ -31,12 +31,8 @@ export class UpdateServiceDto {
     @Max(1)
     status: number;
 
-    @ApiProperty({
-        example: "2025-04-05T10:30:45.123Z",
-        description: "Thời gian updatedAt hiện tại mà client đang thấy. Dùng để tránh xung đột chỉnh sửa"
-    })
-    @IsNotEmpty({ message: "updatedAt là bắt buộc khi cập nhật" })
-    @IsDateString()
-    updatedAt: string | Date;
+  
+    @ApiProperty()
+    version: number;
 
 }
