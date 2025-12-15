@@ -1,0 +1,46 @@
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from "typeorm";
+import { Residents } from "./residents.entity";
+import { Services } from "./services.entity";
+import { Staffs } from "./staffs.entity";
+import { BaseEntity } from "./base.entity";
+
+@Index("PK__service___3213E83F3E14CB04", ["id"], { unique: true })
+@Entity("service_usage_histories", { schema: "dbo" })
+export class ServiceUsageHistories extends BaseEntity{
+  @PrimaryGeneratedColumn({ type: "int", name: "id" })
+  id: number;
+
+  @Column("datetime", {
+    name: "usage_time",
+    nullable: true,
+    default: () => "getdate()",
+  })
+  usageTime: Date | null;
+
+  @Column("nvarchar", { name: "additional_guests", nullable: true })
+  additionalGuests: string | null;
+
+
+  @ManyToOne(() => Residents, (residents) => residents.serviceUsageHistories, {
+    onDelete: "SET NULL",
+  })
+  @JoinColumn([{ name: "resident_id", referencedColumnName: "id" }])
+  resident: Residents;
+
+  @ManyToOne(() => Services, (services) => services.serviceUsageHistories, {
+    onDelete: "CASCADE",
+  })
+  @JoinColumn([{ name: "service_id", referencedColumnName: "id" }])
+  service: Services;
+
+  @ManyToOne(() => Staffs, (staffs) => staffs.serviceUsageHistories)
+  @JoinColumn([{ name: "staff_id", referencedColumnName: "id" }])
+  staff: Staffs;
+}
