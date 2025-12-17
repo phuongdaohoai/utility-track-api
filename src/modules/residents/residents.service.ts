@@ -23,7 +23,9 @@ export class ResidentsService {
         const page = filter.page ?? 1;
         const pageSize = filter.pageSize ?? 10;
 
-        const qb = this.repo.createQueryBuilder('resident');
+        const qb = this.repo
+            .createQueryBuilder('resident')
+            .leftJoinAndSelect('resident.apartment', 'apartment');
 
         if (filter.search?.trim()) {
             const search = filter.search.trim();
