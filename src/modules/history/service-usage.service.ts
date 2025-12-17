@@ -55,7 +55,7 @@ export default class ServiceUsageService {
 
     async getDetail(id: number) {
         const history = await this.repo.findOne({
-            where: { usageId: id },
+            where: { id: id },
             relations: ["resident", "service", "staff"]
         });
         if (!history) {

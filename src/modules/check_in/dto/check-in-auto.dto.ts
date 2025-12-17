@@ -10,13 +10,12 @@ export class CreateCheckInAuTo {
     @IsString()
     code: string;
 
-    @ApiProperty({
-        example: 1,
-        description: 'ID dịch vụ sử dụng (nếu có)'
-    })
-    @IsOptional()
-    @IsNotEmpty({ message: "Lỗi thiết bị:Không quét được dịch vụ" })
-    @IsNumber()
-    serviceId?: number;
+    // @ApiProperty({
+    //     example: 1,
+    //     description: 'ID dịch vụ sử dụng (nếu có)'
+    // })
+    // @IsOptional()
+    // @IsNumber()
+    // serviceId?: number;
 
 }

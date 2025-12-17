@@ -1,10 +1,10 @@
 import { IsString, IsNumber, IsOptional, ValidateIf, IsNotEmpty } from "class-validator";
-import { ApiProperty } from '@nestjs/swagger';
+
 
 export class CreateCheckInDto {
-    @IsNotEmpty({ message: 'Vui lòng chọn dịch vụ' })
-    @IsNumber()
-    ServiceId: number;
+    // @IsNotEmpty({ message: 'Vui lòng chọn dịch vụ' })
+    // @IsNumber()
+    // serviceId: number;
 
     @IsOptional()
     @IsString()
@@ -13,10 +13,10 @@ export class CreateCheckInDto {
     @ValidateIf(o => !o.residentId)
     @IsNotEmpty({ message: 'Vui lòng nhập tên khách' })
     @IsString()
-    guestName?: string;
+    guestName?: string; 
 
     @IsOptional()
-    @IsString()
+    @IsString({ message: 'Số điện thoại không hợp lệ' })
     guestPhone?: string;
 
     @IsOptional()
