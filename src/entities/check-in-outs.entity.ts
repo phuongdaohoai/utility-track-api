@@ -9,6 +9,7 @@ import {
 import { Residents } from "./residents.entity";
 import { Staffs } from "./staffs.entity";
 import { BaseEntity } from "./base.entity";
+import { Services } from "./services.entity";
 
 @Index("PK__check_in__3213E83FA82DED14", ["id"], { unique: true })
 @Entity("check_in_outs", { schema: "dbo" })
@@ -42,4 +43,8 @@ export class CheckInOuts extends BaseEntity{
   @ManyToOne(() => Staffs, (staffs) => staffs.checkInOuts)
   @JoinColumn([{ name: "staff_id", referencedColumnName: "id" }])
   staff: Staffs;
+
+  @ManyToOne(() => Services)
+  @JoinColumn([{ name: "service_id", referencedColumnName: "id" }])
+  service: Services;
 }

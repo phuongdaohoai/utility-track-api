@@ -1,9 +1,12 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { FillerHistoryDto } from "./dto/filter-history.dto";
 import { Repository } from "typeorm";
 import { Brackets } from 'typeorm';
 import { ServiceUsageHistories } from "src/entities/service-usage-histories.entity";
+import { Residents } from "src/entities/residents.entity";
+import { CheckInOuts } from "src/entities/check-in-outs.entity";
+
 
 
 @Injectable()
@@ -11,16 +14,21 @@ export default class ServiceUsageService {
     constructor(
         @InjectRepository(ServiceUsageHistories)
         private repo: Repository<ServiceUsageHistories>,
+        @InjectRepository(Residents)
+        private residentRepo: Repository<Residents>,
+        @InjectRepository(CheckInOuts)
+        private checkInRepo: Repository<CheckInOuts>,
     ) { }
 
     async getHistory(filter: FillerHistoryDto) {
-        const { searchName, serviceId, page = 1, limit = 10 } = filter;
+        const { searchName, page = 1, limit = 10 } = filter;
 
-        const query = this.repo.createQueryBuilder("history")
+        const query = this.checkInRepo.createQueryBuilder("history")
             .leftJoinAndSelect("history.resident", "resident")
             .leftJoinAndSelect("history.service", "service")
             .leftJoinAndSelect("history.staff", "staff")
-            .orderBy("history.usageTime", "DESC");
+            .where("history.service_id IS NOT NULL")
+            .orderBy("history.checkInTime", "DESC");
         // Loc theo ten cu dan  
         if (searchName) {
             query.andWhere(
@@ -54,13 +62,42 @@ export default class ServiceUsageService {
     }
 
     async getDetail(id: number) {
-        const history = await this.repo.findOne({
+        const history = await this.checkInRepo.findOne({
             where: { id: id },
-            relations: ["resident", "service", "staff"]
+            relations: ["resident", "resident.apartment", "service", "staff"]
         });
+
         if (!history) {
-            throw new Error("Không tìm thấy thông tin cư dân");
+            throw new NotFoundException(`Không tìm thấy dữ liệu check-in với ID: ${id}`);
         }
-        return history;
+
+        let familyMembers: Residents[] = [];
+        let apartmentName = 'Khách vãng lai'; // Mặc định là khách
+
+        if (history.resident?.apartment) {
+            apartmentName = `${history.resident.apartment.building} - ${history.resident.apartment.roomNumber}`;
+
+            // Chỉ tìm thành viên khi chắc chắn có căn hộ
+            familyMembers = await this.residentRepo.find({
+                where: {
+                    apartment: { id: history.resident.apartment.id }
+                },
+                select: ["id", "fullName"]
+            });
+        }
+
+        return {
+            id: history.id,
+            apartment: apartmentName,
+            representative: history.resident?.fullName || history.guestName || "Không tên",
+            serviceName: history.service?.serviceName || "Chưa đăng ký",
+            checkInMethod: history.method,
+            checkInTime: history.checkInTime,
+            totalMembers: familyMembers.length || 1,
+            members: familyMembers.map((member, index) => ({
+                no: index + 1,
+                fullName: member.fullName
+            }))
+        };
     }
 }
