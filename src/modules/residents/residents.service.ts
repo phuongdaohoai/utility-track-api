@@ -12,6 +12,13 @@ import { UpdateResidentDto } from './dto/update-resident.dto';
 import { BASE_STATUS } from 'src/common/constants/base-status.constant';
 import { log } from 'console';
 import { NotFoundError } from 'rxjs';
+interface FilterPayload {
+    field: string;
+    operator: string;
+    value?: any;
+    from?: any;
+    to?: any;
+}
 @Injectable()
 export class ResidentsService {
     constructor
@@ -25,21 +32,118 @@ export class ResidentsService {
 
         const qb = this.repo
             .createQueryBuilder('resident')
-            .leftJoinAndSelect('resident.apartment', 'apartment');
+            .leftJoinAndSelect('resident.apartment', 'apartment')
+            .where('resident.deletedAt IS NULL'); // Đảm bảo không lấy bản ghi đã xóa mềm
 
+       
         if (filter.search?.trim()) {
             const search = filter.search.trim();
-
             qb.andWhere(new Brackets(wb => {
-                wb.where("resident.fullName LIKE '%' + :search + '%' COLLATE SQL_Latin1_General_CP1253_CI_AI", { search })
-                    .orWhere("resident.email LIKE '%' + :search + '%' COLLATE SQL_Latin1_General_CP1253_CI_AI", { search })
-                    .orWhere("resident.phone LIKE '%' + :search + '%' COLLATE SQL_Latin1_General_CP1253_CI_AI", { search })
-            }))
+                wb.where("resident.fullName LIKE :search", { search: `%${search}%` })
+                    .orWhere("resident.email LIKE :search", { search: `%${search}%` })
+                    .orWhere("resident.phone LIKE :search", { search: `%${search}%` })       
+                    .orWhere("apartment.roomNumber LIKE :search", { search: `%${search}%` });
+            }));
+        }
+
+       
+        if (filter.filters) {
+            try {
+                const filters: FilterPayload[] = typeof filter.filters === 'string'
+                    ? JSON.parse(filter.filters)
+                    : filter.filters;
+
+                if (Array.isArray(filters)) {
+                    filters.forEach((f, index) => {
+
+                        let dbField = `resident.${f.field}`;
+                        if (f.field === 'room') dbField = 'apartment.roomNumber';
+                        if (f.field === 'joinDate') dbField = 'resident.createdAt';
+                        const pName = `val_${index}_${Math.floor(Math.random() * 1000)}`;
+                        const paramName = `val_${index}_${Math.floor(Math.random() * 1000)}`;
+                        const paramName2 = `val_${index}_2_${Math.floor(Math.random() * 1000)}`;
+                       
+                        
+                        switch (f.operator) {
+                            case 'is':
+                              if (f.value === 'null' || f.value === '') {
+                                    qb.andWhere(`${dbField} IS NULL`);
+                                } else {
+                                   if (f.field === 'joinDate' || f.field === 'birthday') {
+                                        const dateStr = f.value; // YYYY-MM-DD
+                                        qb.andWhere(`${dbField} >= :${pName}_start AND ${dbField} <= :${pName}_end`, {
+                                            [`${pName}_start`]: `${dateStr} 00:00:00`,
+                                            [`${pName}_end`]: `${dateStr} 23:59:59`
+                                        });
+                                    } else {
+                                      
+                                        qb.andWhere(`${dbField} = :${pName}`, { [pName]: f.value });
+                                    }
+                                }
+                                break;
+                            case 'contains':
+                                if (Array.isArray(f.value) && f.value.length > 0) {
+                                    
+                                    qb.andWhere(new Brackets(wb => {
+                                        f.value.forEach((val, i) => {
+                                            const subPName = `${pName}_${i}`;
+                                            wb.orWhere(`${dbField} LIKE :${subPName}`, { [subPName]: `%${val}%` });
+                                        });
+                                    }));
+                                } else {
+                                    // Nếu là chuỗi đơn
+                                    qb.andWhere(`${dbField} LIKE :${pName}`, { [pName]: `%${f.value}%` });
+                                }
+                                break;
+                            case 'is_not':
+                                qb.andWhere(`${dbField} != :${paramName}`, { [paramName]: f.value });
+                                break;
+
+                            case 'contains':
+                                qb.andWhere(`${dbField} LIKE :${paramName}`, { [paramName]: `%${f.value}%` });
+                                break;
+
+                            case 'in': 
+                                if (Array.isArray(f.value) && f.value.length > 0) {
+                                    qb.andWhere(`${dbField} IN (:...${paramName})`, { [paramName]: f.value });
+                                }
+                                break;
+
+                            case 'gt': 
+                                qb.andWhere(`${dbField} > :${paramName}`, { [paramName]: f.value });
+                                break;
+
+                            case 'gte': 
+                                qb.andWhere(`${dbField} >= :${paramName}`, { [paramName]: f.value });
+                                break;
+
+                            case 'lt': 
+                                qb.andWhere(`${dbField} < :${paramName}`, { [paramName]: f.value });
+                                break;
+
+                            case 'lte': 
+                                qb.andWhere(`${dbField} <= :${paramName}`, { [paramName]: f.value });
+                                break;
+
+                            case 'range': 
+                                if (f.from !== undefined && f.to !== undefined) {
+                                    qb.andWhere(`${dbField} BETWEEN :${paramName} AND :${paramName2}`, {
+                                        [paramName]: f.from,
+                                        [paramName2]: f.to
+                                    });
+                                }
+                                break;
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error("Lỗi parse filters:", error);
+                // Có thể throw BadRequestException nếu muốn báo lỗi về FE
+            }
         }
 
         const totalItem = await qb.getCount();
 
-        //panigation
         const items = await qb
             .skip((page - 1) * pageSize)
             .take(pageSize)
