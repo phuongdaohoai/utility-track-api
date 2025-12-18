@@ -18,5 +18,12 @@ export class FilterResidentDto {
     @IsOptional()
     @Type(() => Number)
     @IsNumber()
-    pageSize?: number;          
+    pageSize?: number;     
+    
+    @ApiProperty({ 
+        required: false, 
+        description: 'JSON string chứa mảng các điều kiện lọc: [{field, operator, value}, ...]' 
+    })
+    @IsOptional()
+    filters?: string;
 }
