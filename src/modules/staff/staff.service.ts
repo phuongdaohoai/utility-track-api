@@ -21,7 +21,7 @@ export class StaffService {
         private repo: Repository<Staffs>
     ) { }
 
-async findAll(filter: FilterStaffDto): Promise<PaginationResult<Staffs>> {
+    async findAll(filter: FilterStaffDto): Promise<PaginationResult<Staffs>> {
         const page = filter.page ?? 1;
         const pageSize = filter.pageSize ?? 10;
 
@@ -42,15 +42,15 @@ async findAll(filter: FilterStaffDto): Promise<PaginationResult<Staffs>> {
 
         if (filter.filters) {
             try {
-                 const filters = typeof filter.filters === 'string' 
-                    ? JSON.parse(filter.filters) 
+                const filters = typeof filter.filters === 'string'
+                    ? JSON.parse(filter.filters)
                     : filter.filters;
 
                 if (Array.isArray(filters)) {
                     filters.forEach((f, index) => {
                         let dbField = `staff.${f.field}`;
-                        
-                        if (f.field === 'roleId') dbField = 'role.id'; 
+
+                        if (f.field === 'roleId') dbField = 'role.id';
 
                         if (f.field === 'createdAt') dbField = 'staff.createdAt';
 
@@ -59,7 +59,7 @@ async findAll(filter: FilterStaffDto): Promise<PaginationResult<Staffs>> {
                         switch (f.operator) {
                             case 'is':
                                 if (f.field === 'createdAt') {
-                                   const dateStr = f.value;
+                                    const dateStr = f.value;
                                     qb.andWhere(`${dbField} >= :${pName}_start AND ${dbField} <= :${pName}_end`, {
                                         [`${pName}_start`]: `${dateStr} 00:00:00`,
                                         [`${pName}_end`]: `${dateStr} 23:59:59`
@@ -70,21 +70,21 @@ async findAll(filter: FilterStaffDto): Promise<PaginationResult<Staffs>> {
                                     qb.andWhere(`${dbField} = :${pName}`, { [pName]: f.value });
                                 }
                                 break;
-                            
+
                             case 'is_not':
                                 qb.andWhere(`${dbField} != :${pName}`, { [pName]: f.value });
                                 break;
 
                             case 'contains':
-                               if (Array.isArray(f.value)) {
-                                   qb.andWhere(new Brackets(wb => {
+                                if (Array.isArray(f.value)) {
+                                    qb.andWhere(new Brackets(wb => {
                                         f.value.forEach((v, i) => {
                                             const subP = `${pName}_${i}`;
-                                             wb.orWhere(`${dbField} LIKE :${subP} COLLATE SQL_Latin1_General_CP1253_CI_AI`, { [subP]: `%${v}%` });
+                                            wb.orWhere(`${dbField} LIKE :${subP} COLLATE SQL_Latin1_General_CP1253_CI_AI`, { [subP]: `%${v}%` });
                                         });
                                     }));
                                 } else {
-                                   qb.andWhere(`${dbField} LIKE :${pName} COLLATE SQL_Latin1_General_CP1253_CI_AI`, { [pName]: `%${f.value}%` });
+                                    qb.andWhere(`${dbField} LIKE :${pName} COLLATE SQL_Latin1_General_CP1253_CI_AI`, { [pName]: `%${f.value}%` });
                                 }
                                 break;
 
@@ -96,22 +96,22 @@ async findAll(filter: FilterStaffDto): Promise<PaginationResult<Staffs>> {
 
                             case 'range':
                                 let toVal = f.to;
-                               if (f.field === 'createdAt' && f.to) toVal = `${f.to} 23:59:59`;
-                                
+                                if (f.field === 'createdAt' && f.to) toVal = `${f.to} 23:59:59`;
+
                                 if (f.from && f.to) {
-                                    qb.andWhere(`${dbField} BETWEEN :${pName}_from AND :${pName}_to`, { 
-                                        [`${pName}_from`]: f.from, 
+                                    qb.andWhere(`${dbField} BETWEEN :${pName}_from AND :${pName}_to`, {
+                                        [`${pName}_from`]: f.from,
                                         [`${pName}_to`]: toVal
                                     });
                                 }
                                 break;
-                                
-                            
+
+
                         }
                     });
                 }
-            } catch (error) { 
-                console.error("Lỗi parse filter Staff:", error); 
+            } catch (error) {
+                console.error("Lỗi parse filter Staff:", error);
             }
         }
 
@@ -256,7 +256,7 @@ async findAll(filter: FilterStaffDto): Promise<PaginationResult<Staffs>> {
         }
 
         if (dto.phone && dto.phone !== staff.phone) {
-            const existPhone = await this.repo.findOne({ where: { phone: dto.phone , id : Not(staffId)} });
+            const existPhone = await this.repo.findOne({ where: { phone: dto.phone, id: Not(staffId) } });
             if (existPhone) {
                 throw new BadRequestException('Số điện thoại đã được sử dụng bởi nhân viên khác');
             }
@@ -269,7 +269,11 @@ async findAll(filter: FilterStaffDto): Promise<PaginationResult<Staffs>> {
                 throw new BadRequestException('Email đã được sử dụng bởi nhân viên khác');
             }
         }
-
+        if (dto.password && dto.password.trim().length > 0) {
+            // Hash password mới và gán vào entity
+            const newPasswordHash = await PasswordHelper.hassPassword(dto.password);
+            staff.passwordHash = newPasswordHash;
+        }
 
 
         let avatarUrl = staff.avatar;
@@ -342,7 +346,7 @@ async findAll(filter: FilterStaffDto): Promise<PaginationResult<Staffs>> {
         staff.deletedAt = new Date();
         staff.updatedBy = userId;
         staff.status = BASE_STATUS.INACTIVE;
-``
+        ``
         return await this.repo.softRemove(staff);
     }
 }

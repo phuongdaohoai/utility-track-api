@@ -61,4 +61,10 @@ export class UpdateStaffDto {
     @Type(() => Number)
     version: number;
 
+   @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    @Length(6,100)
+    password?: string;
+
 }
