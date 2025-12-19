@@ -21,29 +21,106 @@ export class StaffService {
         private repo: Repository<Staffs>
     ) { }
 
-    async findAll(filter: FilterStaffDto): Promise<PaginationResult<Staffs>> {
+async findAll(filter: FilterStaffDto): Promise<PaginationResult<Staffs>> {
         const page = filter.page ?? 1;
         const pageSize = filter.pageSize ?? 10;
 
-        const qb = this.repo.createQueryBuilder('staff').leftJoin('staff.role', 'role').addSelect(['role.roleName']);
+        const qb = this.repo.createQueryBuilder('staff')
+            .leftJoin('staff.role', 'role')
+            .addSelect(['role.roleName', 'role.id']) // Lấy thêm ID để map filter
+            .where('staff.deletedAt IS NULL'); // Chỉ lấy chưa xóa
 
+        // 1. TÌM KIẾM CHUNG (Giữ nguyên logic cũ)
         if (filter.search?.trim()) {
             const search = filter.search.trim();
-
             qb.andWhere(new Brackets(wb => {
-                wb.where("staff.fullName LIKE '%' + :search + '%' COLLATE SQL_Latin1_General_CP1253_CI_AI", { search })
-                    .orWhere("staff.email LIKE '%' + :search + '%' COLLATE SQL_Latin1_General_CP1253_CI_AI", { search })
-                    .orWhere("staff.phone LIKE '%' + :search + '%'", { search });
+                wb.where("staff.fullName LIKE :search", { search: `%${search}%` })
+                    .orWhere("staff.email LIKE :search", { search: `%${search}%` })
+                    .orWhere("staff.phone LIKE :search", { search: `%${search}%` });
             }));
+        }
+
+        if (filter.filters) {
+            try {
+                 const filters = typeof filter.filters === 'string' 
+                    ? JSON.parse(filter.filters) 
+                    : filter.filters;
+
+                if (Array.isArray(filters)) {
+                    filters.forEach((f, index) => {
+                        let dbField = `staff.${f.field}`;
+                        
+                        if (f.field === 'roleId') dbField = 'role.id'; 
+
+                        if (f.field === 'createdAt') dbField = 'staff.createdAt';
+
+                        const pName = `s_val_${index}_${Math.floor(Math.random() * 10000)}`;
+
+                        switch (f.operator) {
+                            case 'is':
+                                if (f.field === 'createdAt') {
+                                   const dateStr = f.value;
+                                    qb.andWhere(`${dbField} >= :${pName}_start AND ${dbField} <= :${pName}_end`, {
+                                        [`${pName}_start`]: `${dateStr} 00:00:00`,
+                                        [`${pName}_end`]: `${dateStr} 23:59:59`
+                                    });
+                                } else if (f.value === 'null' || f.value === null) {
+                                    qb.andWhere(`${dbField} IS NULL`);
+                                } else {
+                                    qb.andWhere(`${dbField} = :${pName}`, { [pName]: f.value });
+                                }
+                                break;
+                            
+                            case 'is_not':
+                                qb.andWhere(`${dbField} != :${pName}`, { [pName]: f.value });
+                                break;
+
+                            case 'contains':
+                               if (Array.isArray(f.value)) {
+                                   qb.andWhere(new Brackets(wb => {
+                                        f.value.forEach((v, i) => {
+                                            const subP = `${pName}_${i}`;
+                                             wb.orWhere(`${dbField} LIKE :${subP} COLLATE SQL_Latin1_General_CP1253_CI_AI`, { [subP]: `%${v}%` });
+                                        });
+                                    }));
+                                } else {
+                                   qb.andWhere(`${dbField} LIKE :${pName} COLLATE SQL_Latin1_General_CP1253_CI_AI`, { [pName]: `%${f.value}%` });
+                                }
+                                break;
+
+                            case 'in':
+                                if (Array.isArray(f.value) && f.value.length > 0) {
+                                    qb.andWhere(`${dbField} IN (:...${pName})`, { [pName]: f.value });
+                                }
+                                break;
+
+                            case 'range':
+                                let toVal = f.to;
+                               if (f.field === 'createdAt' && f.to) toVal = `${f.to} 23:59:59`;
+                                
+                                if (f.from && f.to) {
+                                    qb.andWhere(`${dbField} BETWEEN :${pName}_from AND :${pName}_to`, { 
+                                        [`${pName}_from`]: f.from, 
+                                        [`${pName}_to`]: toVal
+                                    });
+                                }
+                                break;
+                                
+                            
+                        }
+                    });
+                }
+            } catch (error) { 
+                console.error("Lỗi parse filter Staff:", error); 
+            }
         }
 
         const totalItem = await qb.getCount();
 
-        //pagination
         const items = await qb
             .skip((page - 1) * pageSize)
             .take(pageSize)
-            .orderBy('staff.id', 'DESC')
+            .orderBy('staff.id', 'DESC') // Sắp xếp mới nhất lên đầu
             .getMany();
 
         return {
