@@ -35,18 +35,18 @@ export class ResidentsService {
             .leftJoinAndSelect('resident.apartment', 'apartment')
             .where('resident.deletedAt IS NULL'); // Đảm bảo không lấy bản ghi đã xóa mềm
 
-       
+
         if (filter.search?.trim()) {
             const search = filter.search.trim();
             qb.andWhere(new Brackets(wb => {
-                wb.where("resident.fullName LIKE :search", { search: `%${search}%` })
-                    .orWhere("resident.email LIKE :search", { search: `%${search}%` })
-                    .orWhere("resident.phone LIKE :search", { search: `%${search}%` })       
-                    .orWhere("apartment.roomNumber LIKE :search", { search: `%${search}%` });
+                wb.where("resident.fullName LIKE :search COLLATE SQL_Latin1_General_CP1253_CI_AI", { search: `%${search}%` })
+                    .orWhere("resident.email LIKE :search COLLATE SQL_Latin1_General_CP1253_CI_AI", { search: `%${search}%` })
+                    .orWhere("resident.phone LIKE :search COLLATE SQL_Latin1_General_CP1253_CI_AI", { search: `%${search}%` })
+                    .orWhere("apartment.roomNumber LIKE :search COLLATE SQL_Latin1_General_CP1253_CI_AI", { search: `%${search}%` });
             }));
         }
 
-       
+
         if (filter.filters) {
             try {
                 const filters: FilterPayload[] = typeof filter.filters === 'string'
@@ -62,37 +62,36 @@ export class ResidentsService {
                         const pName = `val_${index}_${Math.floor(Math.random() * 1000)}`;
                         const paramName = `val_${index}_${Math.floor(Math.random() * 1000)}`;
                         const paramName2 = `val_${index}_2_${Math.floor(Math.random() * 1000)}`;
-                       
-                        
+
+
                         switch (f.operator) {
                             case 'is':
-                              if (f.value === 'null' || f.value === '') {
+                                if (f.value === 'null' || f.value === '') {
                                     qb.andWhere(`${dbField} IS NULL`);
                                 } else {
-                                   if (f.field === 'joinDate' || f.field === 'birthday') {
+                                    if (f.field === 'joinDate' || f.field === 'birthday') {
                                         const dateStr = f.value; // YYYY-MM-DD
                                         qb.andWhere(`${dbField} >= :${pName}_start AND ${dbField} <= :${pName}_end`, {
                                             [`${pName}_start`]: `${dateStr} 00:00:00`,
                                             [`${pName}_end`]: `${dateStr} 23:59:59`
                                         });
                                     } else {
-                                      
+
                                         qb.andWhere(`${dbField} = :${pName}`, { [pName]: f.value });
                                     }
                                 }
                                 break;
                             case 'contains':
-                                if (Array.isArray(f.value) && f.value.length > 0) {
-                                    
-                                    qb.andWhere(new Brackets(wb => {
+                                if (Array.isArray(f.value)) {
+                                   qb.andWhere(new Brackets(wb => {
                                         f.value.forEach((val, i) => {
                                             const subPName = `${pName}_${i}`;
-                                            wb.orWhere(`${dbField} LIKE :${subPName}`, { [subPName]: `%${val}%` });
+                                           
+                                            wb.orWhere(`${dbField} LIKE :${subPName} COLLATE SQL_Latin1_General_CP1253_CI_AI`, { [subPName]: `%${val}%` });
                                         });
                                     }));
                                 } else {
-                                    // Nếu là chuỗi đơn
-                                    qb.andWhere(`${dbField} LIKE :${pName}`, { [pName]: `%${f.value}%` });
+                                    qb.andWhere(`${dbField} LIKE :${pName} COLLATE SQL_Latin1_General_CP1253_CI_AI`, { [pName]: `%${f.value}%` });
                                 }
                                 break;
                             case 'is_not':
@@ -103,29 +102,29 @@ export class ResidentsService {
                                 qb.andWhere(`${dbField} LIKE :${paramName}`, { [paramName]: `%${f.value}%` });
                                 break;
 
-                            case 'in': 
+                            case 'in':
                                 if (Array.isArray(f.value) && f.value.length > 0) {
                                     qb.andWhere(`${dbField} IN (:...${paramName})`, { [paramName]: f.value });
                                 }
                                 break;
 
-                            case 'gt': 
+                            case 'gt':
                                 qb.andWhere(`${dbField} > :${paramName}`, { [paramName]: f.value });
                                 break;
 
-                            case 'gte': 
+                            case 'gte':
                                 qb.andWhere(`${dbField} >= :${paramName}`, { [paramName]: f.value });
                                 break;
 
-                            case 'lt': 
+                            case 'lt':
                                 qb.andWhere(`${dbField} < :${paramName}`, { [paramName]: f.value });
                                 break;
 
-                            case 'lte': 
+                            case 'lte':
                                 qb.andWhere(`${dbField} <= :${paramName}`, { [paramName]: f.value });
                                 break;
 
-                            case 'range': 
+                            case 'range':
                                 if (f.from !== undefined && f.to !== undefined) {
                                     qb.andWhere(`${dbField} BETWEEN :${paramName} AND :${paramName2}`, {
                                         [paramName]: f.from,
