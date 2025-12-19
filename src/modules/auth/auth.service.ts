@@ -77,6 +77,7 @@ export class AuthService {
                 phone: true,
                 email: true,
                 passwordHash: true,
+                avatar: true,
                 role: {
                     id: true,
                 },
