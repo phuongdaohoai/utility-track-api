@@ -31,3 +31,30 @@ export const multerConfig = {
         );
     },
 };
+
+
+export const multerCsvConfig = {
+    storage: memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB 
+    fileFilter: (req, file, cb) => {
+        const ext = extname(file.originalname).toLowerCase();
+
+        const isCsvExtension = ext === '.csv';
+        const isCsvMime = file.mimetype === 'text/csv';
+        const isExcelMime = [
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ].includes(file.mimetype);
+
+        if (isCsvExtension && (isCsvMime || isExcelMime)) {
+            return cb(null, true);
+        }
+
+        return cb(
+            new BadRequestException(
+                'Chỉ chấp nhận file định dạng CSV (.csv)'
+            ),
+            false
+        );
+    },
+};
