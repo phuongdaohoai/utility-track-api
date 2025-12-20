@@ -65,7 +65,6 @@ export class UpdateResidentDto {
         type: 'string',
         format: 'binary',
         required: false,
-        description: 'Ảnh đại diện (jpg, png, webp, tối đa 5MB)',
     })
     avatar?: any;
 

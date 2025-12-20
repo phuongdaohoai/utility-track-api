@@ -27,14 +27,11 @@ export class ResidentsController {
 
     @Post('create')
     @Permissions('Residents.Create')
-    @ApiConsumes('multipart/form-data')
-    @UseInterceptors(FileInterceptor('avatar', multerConfig))
     async create(
-        @UploadedFile() file: Express.Multer.File,
         @Body() dto: CreateResidentDto,
         @Req() req
     ) {
-        const result = await this.service.create(dto, file, req.user.staffId);
+        const result = await this.service.create(dto, req.user.staffId);
         return ApiResponse.ok(result, "Tạo cư dân thành công");
     }
 
@@ -47,15 +44,12 @@ export class ResidentsController {
 
     @Put('update/:residentId')
     @Permissions('Residents.Update')
-    @ApiConsumes('multipart/form-data')
-    @UseInterceptors(FileInterceptor('avatar', multerConfig))
     async update(
         @Param('residentId') residentId: number,
-        @UploadedFile() file: Express.Multer.File,
         @Body() dto: UpdateResidentDto,
         @Req() req
     ) {
-        const result = await this.service.update(residentId, dto, file, req.user.staffId);
+        const result = await this.service.update(residentId, dto, req.user.staffId);
         return ApiResponse.ok(result, "Cập nhật cư dân thành công");
     }
 
