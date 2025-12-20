@@ -67,18 +67,6 @@ export class ResidentsController {
         return ApiResponse.ok(result, "Cập nhật mã QR thành công");
     }
 
-    // Comming soon :vvv
-    // @Post('registerFaceId/:id')
-    // @Permissions('Residents.Create')
-    // async registerFaceId(@Param('id') id: number, @Body('faceIdData') faceIdData: Buffer): Promise<Residents> {
-    //     const result = await this.service.registerFaceId(id, faceIdData);
-    //     return ApiResponse.ok(result, "Cập nhật mã QR thành công");
-    // }
-
-    // async unregisterFaceId(@Param('id') id: number): Promise<void> {
-    //     const result = await this.service.unregisterFaceId(id);
-    //     return ApiResponse.ok(result, "Cập nhật mã QR thành công");
-    // }
 }
 
 
