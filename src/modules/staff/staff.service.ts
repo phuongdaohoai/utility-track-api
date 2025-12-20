@@ -14,6 +14,7 @@ import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
 import { Staffs } from 'src/entities/staffs.entity';
 import { BASE_STATUS } from 'src/common/constants/base-status.constant';
 import { log } from 'console';
+import { BASE_ROLE } from 'src/common/constants/base-role.constant';
 @Injectable()
 export class StaffService {
     constructor(
@@ -249,11 +250,11 @@ export class StaffService {
             throw new BadRequestException('Bạn không thể tự xóa tài khoản của chính mình');
         }
 
-        if (staff.id === 1) {
+        if (staff.id === BASE_ROLE.SUPER_ADMIN.ID) {
             throw new BadRequestException('Không thể xóa tài khoản Super Administrator');
         }
 
-        if (staff.role?.roleName === 'SuperAdmin') {
+        if (staff.role?.roleName === BASE_ROLE.SUPER_ADMIN.NAME) {
             throw new BadRequestException('Không thể xóa tài khoản có vai trò Super Administrator');
         }
 
@@ -261,8 +262,6 @@ export class StaffService {
             throw new ConflictException('Nhân viên này đã bị xóa trước đó');
         }
 
-        // 6. Thực hiện soft delete
-        staff.deletedAt = new Date();
         staff.updatedBy = userId;
         staff.status = BASE_STATUS.INACTIVE;
 ``
