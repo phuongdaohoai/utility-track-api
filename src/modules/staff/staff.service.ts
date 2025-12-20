@@ -14,6 +14,7 @@ import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
 import { Staffs } from 'src/entities/staffs.entity';
 import { BASE_STATUS } from 'src/common/constants/base-status.constant';
 import { log } from 'console';
+import { BASE_ROLE } from 'src/common/constants/base-role.constant';
 @Injectable()
 export class StaffService {
     constructor(
@@ -165,7 +166,7 @@ export class StaffService {
         return staff;
     }
 
-    async create(dto: CreateStaffDto, file: Express.Multer.File | undefined, userId: number) {
+    async create(dto: CreateStaffDto, userId: number) {
         try {
             const existEmail = await this.repo.findOne({
                 where: {
@@ -190,38 +191,14 @@ export class StaffService {
             const defaultPassword = dto.phone;
             const passwordHash = await PasswordHelper.hassPassword(defaultPassword);
 
-            //xử lý ảnh
-            let avatarUrl: string | null = null;
-
-            // CHỈ LƯU FILE KHI ĐÃ QUA VALIDATE
-            if (file) {
-                const randomName = Array(32)
-                    .fill(null)
-                    .map(() => Math.round(Math.random() * 16).toString(16))
-                    .join('');
-                const ext = file.originalname.split('.').pop()?.toLowerCase() || 'jpg';
-                const filename = `${randomName}.${ext}`;
-
-                const rootPath = process.cwd(); // lấy root project (luôn đúng dù ở dist hay src)
-                const filePath = join(rootPath, 'public', 'avatars', filename);
-
-                // TỰ ĐỘNG TẠO THƯ MỤC NẾU CHƯA CÓ
-                const dir = join(rootPath, 'public', 'avatars');
-                if (!existsSync(dir)) {
-                    mkdirSync(dir, { recursive: true });
-                }
-
-                writeFileSync(filePath, file.buffer);
-
-                avatarUrl = `/avatars/${filename}`;
-            }
+            
 
 
             const staff = this.repo.create({
                 ...dto,
                 fullName: dto.fullName,
                 passwordHash,
-                avatar: avatarUrl,
+                avatar: dto.avatar??null,
                 role: { id: dto.roleId } as any,
                 status: 1,
                 createdBy: userId,
@@ -242,7 +219,7 @@ export class StaffService {
         }
     }
 
-    async update(staffId: number, dto: UpdateStaffDto, file: Express.Multer.File | undefined, userId: number) {
+    async update(staffId: number, dto: UpdateStaffDto, userId: number) {
         const staff = await this.findOne(staffId);
 
         if (!staff) {
@@ -275,38 +252,13 @@ export class StaffService {
             staff.passwordHash = newPasswordHash;
         }
 
-
-        let avatarUrl = staff.avatar;
-        if (file) {
-            const randomName = Array(32)
-                .fill(null)
-                .map(() => Math.round(Math.random() * 16).toString(16))
-                .join('');
-            const ext = file.originalname.split('.').pop()?.toLowerCase() || 'jpg';
-            const filename = `${randomName}.${ext}`;
-
-
-            const rootPath = process.cwd();
-            const filePath = join(rootPath, 'public', 'avatars', filename);
-
-
-            const dir = join(rootPath, 'public', 'avatars');
-            if (!existsSync(dir)) {
-                mkdirSync(dir, { recursive: true });
-            }
-
-            writeFileSync(filePath, file.buffer);
-
-            avatarUrl = `/avatars/${filename}`;
-        }
-
         Object.assign(staff, {
             fullName: dto.fullName ?? staff.fullName,
             phone: dto.phone ?? staff.phone,
             email: dto.email ?? staff.email,
             status: dto.status ?? staff.status,
             roleId: dto.roleId ?? staff.role.id,
-            avatar: avatarUrl,
+            avatar: dto.avatar??null,
             updatedBy: userId,
         });
 
@@ -330,11 +282,11 @@ export class StaffService {
             throw new BadRequestException('Bạn không thể tự xóa tài khoản của chính mình');
         }
 
-        if (staff.id === 1) {
+        if (staff.id === BASE_ROLE.SUPER_ADMIN.ID) {
             throw new BadRequestException('Không thể xóa tài khoản Super Administrator');
         }
 
-        if (staff.role?.roleName === 'SuperAdmin') {
+        if (staff.role?.roleName === BASE_ROLE.SUPER_ADMIN.NAME) {
             throw new BadRequestException('Không thể xóa tài khoản có vai trò Super Administrator');
         }
 
@@ -342,8 +294,6 @@ export class StaffService {
             throw new ConflictException('Nhân viên này đã bị xóa trước đó');
         }
 
-        // 6. Thực hiện soft delete
-        staff.deletedAt = new Date();
         staff.updatedBy = userId;
         staff.status = BASE_STATUS.INACTIVE;
         ``

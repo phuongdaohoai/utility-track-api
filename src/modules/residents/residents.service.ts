@@ -173,7 +173,7 @@ export class ResidentsService {
         return resident;
     }
 
-    async create(dto: CreateResidentDto, file: Express.Multer.File | undefined, userId: number) {
+    async create(dto: CreateResidentDto,  userId: number) {
         try {
             const existEmail = await this.repo.findOne({
                 where: {
@@ -195,29 +195,7 @@ export class ResidentsService {
                 throw new BadRequestException("Số điện thoại đã tồn tại");
             }
 
-            let avatarUrl: string | null = null;
-
-            // CHỈ LƯU FILE KHI ĐÃ QUA VALIDATE
-            if (file) {
-                const randomName = Array(32)
-                    .fill(null)
-                    .map(() => Math.round(Math.random() * 16).toString(16))
-                    .join('');
-                const ext = file.originalname.split('.').pop()?.toLowerCase() || 'jpg';
-                const filename = `${randomName}.${ext}`;
-
-                const rootPath = process.cwd(); // lấy root project (luôn đúng dù ở dist hay src)
-                const filePath = join(rootPath, 'public', 'avatars', filename);
-
-                const dir = join(rootPath, 'public', 'avatars');
-                if (!existsSync(dir)) {
-                    mkdirSync(dir, { recursive: true });
-                }
-
-                writeFileSync(filePath, file.buffer);
-
-                avatarUrl = `/avatars/${filename}`;
-            }
+           
 
             const qrToken = crypto.randomBytes(32).toString('hex');
 
@@ -230,7 +208,7 @@ export class ResidentsService {
                 birthday: dto.birthday ? new Date(dto.birthday) : null,
                 apartment: dto.apartmentId ? { id: dto.apartmentId } as any : undefined,
                 qrCode: qrToken,
-                avatar: avatarUrl,
+                avatar: dto.avatar??null,
                 status: 1,
 
                 createdBy: userId,
@@ -251,7 +229,7 @@ export class ResidentsService {
         }
     }
 
-    async update(residentId: number, dto: UpdateResidentDto, file: Express.Multer.File | undefined, userId: number) {
+    async update(residentId: number, dto: UpdateResidentDto,  userId: number) {
         const resident = await this.repo.findOne({ where: { id: residentId } });
 
         if (!resident) {
@@ -277,27 +255,7 @@ export class ResidentsService {
             }
         }
 
-        let avatarUrl = resident.avatar;
-        if (file) {
-            const randomName = Array(32)
-                .fill(null)
-                .map(() => Math.round(Math.random() * 16).toString(16))
-                .join('');
-            const ext = file.originalname.split('.').pop()?.toLowerCase() || 'jpg';
-            const filename = `${randomName}.${ext}`;
-
-            const rootPath = process.cwd();
-            const filePath = join(rootPath, 'public', 'avatars', filename);
-
-            const dir = join(rootPath, 'public', 'avatars');
-            if (!existsSync(dir)) {
-                mkdirSync(dir, { recursive: true });
-            }
-
-            writeFileSync(filePath, file.buffer);
-
-            avatarUrl = `/avatars/${filename}`;
-        }
+      
 
         Object.assign(resident, {
             fullName: dto.fullName ?? resident.fullName,
@@ -308,7 +266,7 @@ export class ResidentsService {
             birthday: dto.birthday ? new Date(dto.birthday) : resident.birthday,
             apartmentId: dto.apartmentId ?? resident.apartment?.id,
             status: dto.status ?? resident.status,
-            avatar: avatarUrl,
+            avatar: dto.avatar??null,
             updatedBy: userId,
         });
 

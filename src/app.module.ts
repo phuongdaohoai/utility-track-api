@@ -10,6 +10,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ServiceUsageModule } from './modules/history/service-usage.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { UploadModule } from './modules/upload/upload.module';
 
 @Module({
   imports: [
@@ -37,7 +38,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     AuthModule,
     ServiceUsageModule,
     RolesModule,
-    DashboardModule
+    DashboardModule,
+    UploadModule
   ],
   controllers: [AppController],
   providers: [AppService],
