@@ -5,6 +5,8 @@ import { Repository } from "typeorm";
 import { Brackets } from 'typeorm';
 import { ServiceUsageHistories } from "src/entities/service-usage-histories.entity";
 import { ERROR_CODE } from "src/common/constants/error-code.constant";
+import { QueryBuilderHelper } from "src/common/helper/query-builder.helper";
+
 
 
 @Injectable()
@@ -15,7 +17,6 @@ export default class ServiceUsageService {
     ) { }
 
     async getHistory(filter: FillerHistoryDto) {
-        const { searchName, serviceId, page = 1, limit = 10 } = filter;
 
         const query = this.repo.createQueryBuilder("history")
             .leftJoinAndSelect("history.resident", "resident")
@@ -23,14 +24,10 @@ export default class ServiceUsageService {
             .leftJoinAndSelect("history.staff", "staff")
             .orderBy("history.usageTime", "DESC");
         // Loc theo ten cu dan  
-        if (searchName) {
-            query.andWhere(
-                new Brackets((qb) => {
-                    qb.where("resident.fullName LIKE :name", { name: `%${searchName}%` })
-                        .orWhere("service.serviceName LIKE :name", { name: `%${searchName}%` })
-                })
-            );
-
+        QueryBuilderHelper.applySearch(query, filter.searchName?.trim(), [
+            { entityAlias: 'resident', field: 'fullName', collate: true },
+            { entityAlias: 'service', field: 'serviceName', collate: true },
+        ]);
         }
         if (serviceId) {
             query.andWhere("history.serviceId = :serviceId", { serviceId })
@@ -55,6 +52,21 @@ export default class ServiceUsageService {
             }
 
         }
+        query.orderBy('history.usageTime', 'DESC');
+
+        // 4. Phân trang
+        const { items, totalItem, page, pageSize } = await QueryBuilderHelper.applyPagination(
+            query,
+            filter.page ?? 1,
+            filter.limit ?? 10,
+        );
+
+        return {
+            items,
+            totalItem,
+            page,
+            pageSize,
+        };
     }
 
     async getDetail(id: number) {

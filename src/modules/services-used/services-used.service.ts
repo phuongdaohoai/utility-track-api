@@ -9,6 +9,7 @@ import { FilterServiceDto } from './dto/filter-service.dto';
 import { ApiResponse } from 'src/common/response.dto';
 import { BASE_STATUS } from 'src/common/constants/base-status.constant';
 import { ERROR_CODE } from 'src/common/constants/error-code.constant';
+import { QueryBuilderHelper } from 'src/common/helper/query-builder.helper';
 
 @Injectable()
 export class ServicesUsedService {
@@ -18,19 +19,23 @@ export class ServicesUsedService {
     ) { }
 
     async findAll(filter: FilterServiceDto): Promise<PaginationResult<Services>> {
-        const page = filter.page ?? 1;
-        const pageSize = filter.pageSize ?? 10;
-
         const qb = this.repo.createQueryBuilder('service');
 
-        const totalItem = await qb.getCount();
+        // Tìm kiếm theo tên dịch vụ hoặc mô tả (nếu có)
+        QueryBuilderHelper.applySearch(qb, filter.search?.trim(), [
+            { entityAlias: 'service', field: 'serviceName', collate: true },
+            { entityAlias: 'service', field: 'description', collate: true },
+        ]);
 
-        //panigation
-        const items = await qb
-            .skip((page - 1) * pageSize)
-            .take(pageSize)
-            .orderBy('service.id', 'DESC')
-            .getMany();
+        // Sắp xếp theo ID mới nhất
+        qb.orderBy('service.id', 'DESC');
+
+        // Phân trang
+        const { items, totalItem, page, pageSize } = await QueryBuilderHelper.applyPagination(
+            qb,
+            filter.page ?? 1,
+            filter.pageSize ?? 10,
+        );
 
         return {
             totalItem,
@@ -41,7 +46,11 @@ export class ServicesUsedService {
     }
     async findById(id: number) {
         const service = await this.findOne(id);
-        return ApiResponse.ok(service);
+        if (!service) throw new NotFoundException({
+            errorCode:ERROR_CODE.SERVICE_NOT_FOUND,
+            message: "Không tìm thấy dịch vụ",
+        })
+        return service;
     }
     async findOne(id: number) {
         const service = await this.repo.findOne({ where: { id: id } });

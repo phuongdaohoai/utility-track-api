@@ -4,7 +4,7 @@ import { Roles } from 'src/entities/roles.entity';
 import { Repository } from 'typeorm';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthService } from './jwt-auth.service';
-import { PasswordHelper } from 'src/helper/password.helper';
+import { PasswordHelper } from 'src/common/helper/password.helper';
 import { Staffs } from 'src/entities/staffs.entity';
 import { ERROR_CODE } from 'src/common/constants/error-code.constant';
 
