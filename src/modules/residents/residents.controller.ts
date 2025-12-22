@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ResidentsService } from './residents.service';
 import { ApiBearerAuth, ApiBody, ApiConsumes } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
@@ -38,10 +38,14 @@ export class ResidentsController {
 
     @Get('getById/:residentId')
     @Permissions('Residents.View')
-    async getById(@Param('residentId') residentId: number) {
-        const result = await this.service.findById(residentId);
-        return ApiResponse.ok(result);
+    async getById(
+        @Param('residentId', ParseIntPipe) residentId: number
+    ) {
+        return ApiResponse.ok(
+            await this.service.findById(+residentId)
+        );
     }
+
 
     @Put('update/:residentId')
     @Permissions('Residents.Update')
@@ -79,7 +83,7 @@ export class ResidentsController {
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', 'attachment; filename="mau-import-cu-dan.csv"');
-        res.send('\uFEFF' + csvContent); 
+        res.send('\uFEFF' + csvContent);
     }
 
     @Post('import')
