@@ -36,6 +36,7 @@ export class CreateStaffDto {
         description: 'Ảnh đại diện nhân viên (jpg, png, webp, gif - tối đa 5MB)',
     })
     @IsOptional()
+    @IsString()
     avatar?: string;
 
     @ApiProperty({ example: 3, description: 'Vai trò: 1=Admin, 2=Quản lý, 3=Lễ tân, 4=Bảo vệ...' })

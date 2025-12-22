@@ -74,5 +74,7 @@ export class CreateResidentDto {
         format: 'binary',
         required: false,
     })
+    @IsOptional()
+    @IsString()
     avatar?: any;
 }

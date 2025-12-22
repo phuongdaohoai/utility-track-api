@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Residents } from 'src/entities/residents.entity';
-import { Brackets, Not, Repository } from 'typeorm';
+import { Brackets, In, Not, Repository } from 'typeorm';
 import { FilterResidentDto } from './dto/filter-resident.dto';
 import { PaginationResult } from 'src/common/pagination.dto';
 import { CreateResidentDto, GenderEnum } from './dto/create-resident.dto';
@@ -11,6 +11,7 @@ import { BASE_STATUS } from 'src/common/constants/base-status.constant';
 import { log } from 'console';
 import { parse } from '@fast-csv/parse';
 import { Readable } from 'stream';
+import { ImportResidentItemDto } from './dto/import-csv.dto';
 interface FilterPayload {
     field: string;
     operator: string;
@@ -193,6 +194,15 @@ export class ResidentsService {
                 throw new BadRequestException("Số điện thoại đã tồn tại");
             }
 
+            const existCitizenCard = await this.repo.findOne({
+                where: {
+                    citizenCard: dto.citizenCard,
+                }
+            });
+
+            if (existCitizenCard) {
+                throw new BadRequestException("CCCD đã tồn tại");
+            }
 
 
             const qrToken = crypto.randomBytes(32).toString('hex');
@@ -206,7 +216,7 @@ export class ResidentsService {
                 birthday: dto.birthday ? new Date(dto.birthday) : null,
                 apartment: dto.apartmentId ? { id: dto.apartmentId } as any : undefined,
                 qrCode: qrToken,
-                avatar: dto.avatar ?? null,
+                avatar: dto.avatar,
                 status: 1,
 
                 createdBy: userId,
@@ -329,121 +339,62 @@ export class ResidentsService {
     }
 
 
-    async importFromCsv(file: Express.Multer.File, userId: number) {
+    async importResidents(dtos: ImportResidentItemDto[], userId: number) {
         const results: any[] = [];
-        const errors: { row: number; error: string }[] = [];
+        const errors: { index: number; error: string }[] = [];
 
-        const stream = Readable.from(file.buffer);
+        // Kiểm tra trùng toàn bộ trước (tối ưu)
+        const phones = dtos.map(d => d.phone);
+        const citizenCards = dtos.map(d => d.citizenCard);
+        const emails = dtos.map(d => d.email).filter(Boolean);
 
-        const parser = parse({
-            headers: true,
-            trim: true,
-            ignoreEmpty: true,
-            delimiter: ',',
-            encoding: 'utf8',
-        })
-            .validate((row: any): boolean => {
-                if (!row.fullName?.trim()) return false;
-                if (!row.phone?.trim()) return false;
-                if (!row.citizenCard?.trim()) return false;
-                if (!row.gender?.trim()) return false;
-                return true;
-            })
-            .on('data-invalid', (row, rowNumber) => {
-                errors.push({
-                    row: rowNumber,
-                    error: 'Thiếu hoặc sai các trường bắt buộc: fullName, phone, citizenCard, gender'
+        const existingPhones = await this.repo.find({ where: { phone: In(phones) } });
+        const existingCccd = await this.repo.find({ where: { citizenCard: In(citizenCards) } });
+        const existingEmails = emails.length ? await this.repo.find({ where: { email: In(emails) } }) : [];
+
+        const phoneSet = new Set(existingPhones.map(r => r.phone));
+        const cccdSet = new Set(existingCccd.map(r => r.citizenCard));
+        const emailSet = new Set(existingEmails.map(r => r.email));
+
+        for (let i = 0; i < dtos.length; i++) {
+            const dto = dtos[i];
+
+            // Kiểm tra trùng
+            if (phoneSet.has(dto.phone)) {
+                errors.push({ index: i + 2, error: `Số điện thoại ${dto.phone} đã tồn tại` });
+                continue;
+            }
+            if (cccdSet.has(dto.citizenCard)) {
+                errors.push({ index: i + 2, error: `CCCD ${dto.citizenCard} đã tồn tại` });
+                continue;
+            }
+            if (dto.email && emailSet.has(dto.email)) {
+                errors.push({ index: i + 2, error: `Email ${dto.email} đã tồn tại` });
+                continue;
+            }
+
+            try {
+                const resident = this.repo.create({
+                    ...dto,
+                    birthday: new Date(dto.birthday),
+                    apartment: dto.apartmentId ? { id: dto.apartmentId } : undefined,
+                    qrCode: crypto.randomBytes(32).toString('hex'),
+                    avatar: null,
+                    status: 1,
+                    createdBy: userId,
+                    updatedBy: userId,
                 });
-            })
-            .on('error', (error) => {
-                throw new BadRequestException(`Lỗi đọc file CSV: ${error.message}`);
-            })
-            .on('data-invalid', (row, rowNumber, reason) => {
-                errors.push({ row: rowNumber, error: reason || 'Dữ liệu không hợp lệ' });
-            })
-            .on('data', async (row) => {
-                parser.pause(); // ← ĐÚNG: pause PARSER
 
-                try {
-                    const dto: CreateResidentDto = {
-                        fullName: row.fullName?.trim(),
-                        phone: row.phone?.trim(),
-                        email: row.email?.trim() || null,
-                        citizenCard: row.citizenCard?.trim(),
-                        gender: this.mapGender(row.gender?.trim()),
-                        birthday: row.birthday?.trim() || null,
-                        apartmentId: row.apartmentId ? parseInt(row.apartmentId.trim(), 10) : undefined,
-                        avatar: null,
-                    };
-
-                    // Kiểm tra trùng
-                    const existPhone = await this.repo.findOne({ where: { phone: dto.phone } });
-                    if (existPhone) {
-                        errors.push({ row: results.length + errors.length + 2, error: `Số điện thoại ${dto.phone} đã tồn tại` });
-                        parser.resume();
-                        return;
-                    }
-
-                    const existEmail = dto.email ? await this.repo.findOne({ where: { email: dto.email } }) : null;
-                    if (existEmail) {
-                        errors.push({ row: results.length + errors.length + 2, error: `Email ${dto.email} đã tồn tại` });
-                        parser.resume();
-                        return;
-                    }
-
-                    const existCccd = await this.repo.findOne({ where: { citizenCard: dto.citizenCard } });
-                    if (existCccd) {
-                        errors.push({ row: results.length + errors.length + 2, error: `CCCD ${dto.citizenCard} đã tồn tại` });
-                        parser.resume();
-                        return;
-                    }
-
-                    if (!dto.phone.startsWith('0') || dto.phone.length !== 10) {
-                        throw new Error('Số điện thoại phải bắt đầu bằng 0 và có 10 số');
-                    }
-
-                    if (dto.citizenCard.length !== 12 || !/^\d{12}$/.test(dto.citizenCard)) {
-                        throw new Error('CCCD phải đúng 12 chữ số');
-                    }
-                    const qrToken = crypto.randomBytes(32).toString('hex');
-                    const newResident = this.repo.create({
-                        ...dto,
-                        birthday: dto.birthday ? new Date(dto.birthday) : null,
-                        apartment: dto.apartmentId ? { id: dto.apartmentId } : undefined,
-                        qrCode: qrToken,
-                        avatar: null,
-                        status: 1,
-                        createdBy: userId,
-                        updatedBy: userId,
-                        faceIdData: null,
-                    });
-
-                    const saved = await this.repo.save(newResident);
-                    results.push({
-                        id: saved.id,
-                        fullName: saved.fullName,
-                        phone: saved.phone,
-                        email: saved.email,
-                        citizenCard: saved.citizenCard,
-                    });
-
-                } catch (err: any) {
-                    errors.push({
-                        row: results.length + errors.length + 2,
-                        error: err.message || 'Lỗi tạo cư dân',
-                    });
-                } finally {
-                    parser.resume(); // ← ĐÚNG: resume PARSER
-                }
-            });
-
-        stream.pipe(parser);
-
-        // Chờ PARSER hoàn tất, không phải stream
-        await new Promise((resolve, reject) => {
-            parser.on('end', resolve);
-            parser.on('error', reject);
-        });
+                const saved = await this.repo.save(resident);
+                results.push({
+                    id: saved.id,
+                    fullName: saved.fullName,
+                    phone: saved.phone,
+                });
+            } catch (err) {
+                errors.push({ index: i + 2, error: 'Lỗi lưu dữ liệu' });
+            }
+        }
 
         return {
             successCount: results.length,
@@ -453,13 +404,6 @@ export class ResidentsService {
         };
     }
 
-    // Helper để map giới tính (vì enum là tiếng Việt)
-    private mapGender(genderStr: string): GenderEnum {
-        if (!genderStr) return GenderEnum.Other;
-        const normalized = genderStr.toLowerCase().trim();
-        if (['nam', 'male', '1'].includes(normalized)) return GenderEnum.Male;
-        if (['nữ', 'nu', 'female', '0', '2'].includes(normalized)) return GenderEnum.Female;
-        return GenderEnum.Other;
-    }
+
 }
 
