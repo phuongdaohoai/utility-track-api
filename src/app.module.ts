@@ -11,6 +11,7 @@ import { ServiceUsageModule } from './modules/history/service-usage.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { ApartmentModule } from './modules/apartment/apartment.module';
 
 @Module({
   imports: [
@@ -39,7 +40,8 @@ import { UploadModule } from './modules/upload/upload.module';
     ServiceUsageModule,
     RolesModule,
     DashboardModule,
-    UploadModule
+    UploadModule,
+    ApartmentModule
   ],
   controllers: [AppController],
   providers: [AppService],
