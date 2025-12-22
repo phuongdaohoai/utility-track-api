@@ -17,6 +17,7 @@ import {
 } from 'class-validator';
 import { GenderEnum } from './create-resident.dto';
 import { Type } from 'class-transformer';
+import { Optional } from '@nestjs/common';
 
 export class UpdateResidentDto {
     @ApiProperty({ example: 'Nguyễn Thị Hương', description: 'Họ và tên nhân viên' })
@@ -66,6 +67,8 @@ export class UpdateResidentDto {
         format: 'binary',
         required: false,
     })
+    @IsString()
+    @Optional()
     avatar?: any;
 
 
