@@ -1,9 +1,10 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { FillerHistoryDto } from "./dto/filter-history.dto";
 import { Repository } from "typeorm";
 import { Brackets } from 'typeorm';
 import { ServiceUsageHistories } from "src/entities/service-usage-histories.entity";
+import { ERROR_CODE } from "src/common/constants/error-code.constant";
 
 
 @Injectable()
@@ -31,25 +32,28 @@ export default class ServiceUsageService {
             );
 
         }
+        if (serviceId) {
+            query.andWhere("history.serviceId = :serviceId", { serviceId })
+        }
         //Phan trang
-        let pageNum = Number(page) > 0 ? Number(page) : 1;
-        const limitNum = Number(limit) > 0 ? Number(limit) : 10;
+        let pageNum = Math.max(1, Number(page));
+        const limitNum = Math.max(1, Number(limit))
         const skip = (pageNum - 1) * limitNum;
-
         query.skip(skip).take(limitNum);
         let [data, total] = await query.getManyAndCount();
-        const totalPages = Math.ceil(total / limitNum);
-        if (total > 0 && pageNum > totalPages) {
-            query.skip(0).take(limitNum);
-            data = await query.getMany();
-            pageNum = 1;
+        const TotalPages = Math.ceil(total / limitNum);
+        if (total > 0 && pageNum > TotalPages) {
+            throw new BadRequestException(ERROR_CODE.HISTORY_INVALID_PAGE)
         }
         return {
             data,
-            total,
+            meta: {
+                total,
             limit: limitNum,
-            page: Number(page),
-            totalPages: Math.ceil(total / Number(limitNum)),
+                page: pageNum,
+                totalPages: TotalPages
+            }
+
         }
     }
 
@@ -59,7 +63,7 @@ export default class ServiceUsageService {
             relations: ["resident", "service", "staff"]
         });
         if (!history) {
-            throw new Error("Không tìm thấy thông tin cư dân");
+            throw new NotFoundException(ERROR_CODE.HISTORY_NOT_FOUND);
         }
         return history;
     }

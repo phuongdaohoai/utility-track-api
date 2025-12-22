@@ -13,6 +13,12 @@ export const ERROR_CODE = {
     AUTH_NO_PERMISSIONS_PROVIDED: 'AUTH_NO_PERMISSIONS_PROVIDED', // User không có permissions nào
     //dashboard moudle
     //history modole
+    HISTORY_SUCCESS: 'success',
+    HISTORY_INVALID_PAGE: 'Invalid page number',//Số trang không hợp lệ
+    HISTORY_SYSTEM_ERROR: 'Internal server error, please try again later',//Lỗi hệ thống,xin thử lại
+    HISTORY_NOT_FOUND: 'Service usage history not found',//Không tìm thấy lịch sử dịch vụ
+    HISTORY_INVALID_DATE: 'Invalid usage date',//Ngày sử dụng không hợp lệ
+    HISTORY_DUPLICATE_ENTRY: 'Service usage entry already exists',//Lịch sử đã tồn tại
     // ==================== RESIDENT MODULE ====================
     RESIDENT_NOT_FOUND: 'RESIDENT_NOT_FOUND',    // Không tìm thấy cư dân theo ID  
     RESIDENT_IMPORT_DUPLICATE_PHONE: 'RESIDENT_IMPORT_DUPLICATE_PHONE', // Import cư dân bị trùng số điện thoại trong file import
