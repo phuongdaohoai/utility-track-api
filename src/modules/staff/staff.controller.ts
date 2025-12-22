@@ -27,13 +27,10 @@ export class StaffController {
 
     @Post('create')
     @Permissions('Staff.Create')
-    @ApiConsumes('multipart/form-data')
-    @UseInterceptors(FileInterceptor('avatar', multerConfig))
     async create(
-        @UploadedFile() file: Express.Multer.File,
         @Body() dto: CreateStaffDto,
         @Req() req) {
-        const result= await this.service.create(dto, file, req.user.staffId);
+        const result= await this.service.create(dto, req.user.staffId);
         return ApiResponse.ok(result, "Thêm nhân viên thành công");
     }
 
@@ -48,14 +45,11 @@ export class StaffController {
 
     @Put('update/:staffId')
     @Permissions('Staff.Update')
-    @ApiConsumes('multipart/form-data')
-    @UseInterceptors(FileInterceptor('avatar', multerConfig))
     async update(
         @Param('staffId') staffId: number,
-        @UploadedFile() file: Express.Multer.File,
         @Body() dto: UpdateStaffDto,
         @Req() req) {
-        const result=await this.service.update(+staffId, dto, file, req.user.staffId);
+        const result=await this.service.update(+staffId, dto, req.user.staffId);
         return ApiResponse.ok(result,"Cập nhật nhân viên thành công");
     }
 

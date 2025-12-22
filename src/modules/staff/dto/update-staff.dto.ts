@@ -45,7 +45,6 @@ export class UpdateStaffDto {
         description: 'Ảnh đại diện nhân viên (jpg, png, webp, gif - tối đa 5MB)',
     })
     @IsOptional()
-    @IsUrl({}, { message: 'Avatar phải là link hợp lệ' })
     avatar?: string;
 
     @ApiProperty({ example: 3, description: 'Vai trò: 1=Admin, 2=Quản lý..' })
