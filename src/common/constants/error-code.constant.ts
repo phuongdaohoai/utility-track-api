@@ -19,11 +19,9 @@ export const ERROR_CODE = {
     HISTORY_NOT_FOUND: 'HISTORY_NOT_FOUND',//Không tìm thấy lịch sử dịch vụ
     HISTORY_INVALID_DATE: 'HISTORY_INVALID_DATE',//Ngày sử dụng không hợp lệ
     HISTORY_DUPLICATE_ENTRY: 'HISTORY_DUPLICATE_ENTRY',//Lịch sử đã tồn tại
-  
-  
     SERVICE_USAGE_HISTORY_NOT_FOUND: 'SERVICE_USAGE_HISTORY_NOT_FOUND', // Không tìm thấy lịch sử sử dụng dịch vụ
 
-    
+
     // ==================== RESIDENT MODULE ====================
     RESIDENT_NOT_FOUND: 'RESIDENT_NOT_FOUND',    // Không tìm thấy cư dân theo ID  
     RESIDENT_IMPORT_DUPLICATE_PHONE: 'RESIDENT_IMPORT_DUPLICATE_PHONE', // Import cư dân bị trùng số điện thoại trong file import
