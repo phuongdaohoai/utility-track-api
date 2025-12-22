@@ -1,20 +1,17 @@
 import { FilterStaffDto } from './dto/filter-staff.dto';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Injector } from '@nestjs/core/injector/injector';
 import { InjectRepository } from '@nestjs/typeorm';
-import { StaffModule } from './staff.module';
 import { Brackets, Not, Repository } from 'typeorm';
 import { PaginationResult } from 'src/common/pagination.dto';
-import { ApiResponse } from 'src/common/response.dto';
 import { CreateStaffDto } from './dto/create-staff.dto';
-import { PasswordHelper } from 'src/helper/password.helper';
+import { PasswordHelper } from 'src/common/helper/password.helper';
 import { UpdateStaffDto } from './dto/update-staff.dto';
-import { join } from 'path';
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
 import { Staffs } from 'src/entities/staffs.entity';
 import { BASE_STATUS } from 'src/common/constants/base-status.constant';
-import { log } from 'console';
 import { BASE_ROLE } from 'src/common/constants/base-role.constant';
+import { ERROR_CODE } from 'src/common/constants/error-code.constant';
+import { error } from 'console';
+import { QueryBuilderHelper } from 'src/common/helper/query-builder.helper';
 @Injectable()
 export class StaffService {
     constructor(
@@ -23,106 +20,34 @@ export class StaffService {
     ) { }
 
     async findAll(filter: FilterStaffDto): Promise<PaginationResult<Staffs>> {
-        const page = filter.page ?? 1;
-        const pageSize = filter.pageSize ?? 10;
 
         const qb = this.repo.createQueryBuilder('staff')
             .leftJoin('staff.role', 'role')
             .addSelect(['role.roleName', 'role.id']) // Lấy thêm ID để map filter
             .where('staff.deletedAt IS NULL'); // Chỉ lấy chưa xóa
 
-        // 1. TÌM KIẾM CHUNG (Giữ nguyên logic cũ)
-        if (filter.search?.trim()) {
-            const search = filter.search.trim();
-            qb.andWhere(new Brackets(wb => {
-                wb.where("staff.fullName LIKE :search", { search: `%${search}%` })
-                    .orWhere("staff.email LIKE :search", { search: `%${search}%` })
-                    .orWhere("staff.phone LIKE :search", { search: `%${search}%` });
-            }));
-        }
+        // Tìm kiếm chung (họ tên, email, phone)
+        QueryBuilderHelper.applySearch(qb, filter.search?.trim(), [
+            { entityAlias: 'staff', field: 'fullName', collate: true },
+            { entityAlias: 'staff', field: 'email', collate: true },
+            { entityAlias: 'staff', field: 'phone', collate: true },
+        ]);
 
-        if (filter.filters) {
-            try {
-                const filters = typeof filter.filters === 'string'
-                    ? JSON.parse(filter.filters)
-                    : filter.filters;
+        // Filter động (roleId, createdAt, status...)
+        QueryBuilderHelper.applyFilters(qb, filter.filters, {
+            roleId: 'role.id',
+            createdAt: 'staff.createdAt',
+        });
 
-                if (Array.isArray(filters)) {
-                    filters.forEach((f, index) => {
-                        let dbField = `staff.${f.field}`;
+        // Sắp xếp theo mới nhất
+        qb.orderBy('staff.id', 'DESC');
 
-                        if (f.field === 'roleId') dbField = 'role.id';
-
-                        if (f.field === 'createdAt') dbField = 'staff.createdAt';
-
-                        const pName = `s_val_${index}_${Math.floor(Math.random() * 10000)}`;
-
-                        switch (f.operator) {
-                            case 'is':
-                                if (f.field === 'createdAt') {
-                                    const dateStr = f.value;
-                                    qb.andWhere(`${dbField} >= :${pName}_start AND ${dbField} <= :${pName}_end`, {
-                                        [`${pName}_start`]: `${dateStr} 00:00:00`,
-                                        [`${pName}_end`]: `${dateStr} 23:59:59`
-                                    });
-                                } else if (f.value === 'null' || f.value === null) {
-                                    qb.andWhere(`${dbField} IS NULL`);
-                                } else {
-                                    qb.andWhere(`${dbField} = :${pName}`, { [pName]: f.value });
-                                }
-                                break;
-
-                            case 'is_not':
-                                qb.andWhere(`${dbField} != :${pName}`, { [pName]: f.value });
-                                break;
-
-                            case 'contains':
-                                if (Array.isArray(f.value)) {
-                                    qb.andWhere(new Brackets(wb => {
-                                        f.value.forEach((v, i) => {
-                                            const subP = `${pName}_${i}`;
-                                            wb.orWhere(`${dbField} LIKE :${subP} COLLATE SQL_Latin1_General_CP1253_CI_AI`, { [subP]: `%${v}%` });
-                                        });
-                                    }));
-                                } else {
-                                    qb.andWhere(`${dbField} LIKE :${pName} COLLATE SQL_Latin1_General_CP1253_CI_AI`, { [pName]: `%${f.value}%` });
-                                }
-                                break;
-
-                            case 'in':
-                                if (Array.isArray(f.value) && f.value.length > 0) {
-                                    qb.andWhere(`${dbField} IN (:...${pName})`, { [pName]: f.value });
-                                }
-                                break;
-
-                            case 'range':
-                                let toVal = f.to;
-                                if (f.field === 'createdAt' && f.to) toVal = `${f.to} 23:59:59`;
-
-                                if (f.from && f.to) {
-                                    qb.andWhere(`${dbField} BETWEEN :${pName}_from AND :${pName}_to`, {
-                                        [`${pName}_from`]: f.from,
-                                        [`${pName}_to`]: toVal
-                                    });
-                                }
-                                break;
-
-
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error("Lỗi parse filter Staff:", error);
-            }
-        }
-
-        const totalItem = await qb.getCount();
-
-        const items = await qb
-            .skip((page - 1) * pageSize)
-            .take(pageSize)
-            .orderBy('staff.id', 'DESC') // Sắp xếp mới nhất lên đầu
-            .getMany();
+        // Phân trang
+        const { items, totalItem, page, pageSize } = await QueryBuilderHelper.applyPagination(
+            qb,
+            filter.page ?? 1,
+            filter.pageSize ?? 10,
+        );
 
         return {
             totalItem,
@@ -156,7 +81,10 @@ export class StaffService {
             }
         });
 
-        if (!staff) throw new NotFoundException("Không tìm thấy nhân viên");
+        if (!staff) throw new NotFoundException({
+            errorCode: ERROR_CODE.STAFF_NOT_FOUND,
+            message: "Không tìm thấy nhân viên",
+        });
         return staff;
     }
 
@@ -175,7 +103,10 @@ export class StaffService {
             });
 
             if (existEmail) {
-                throw new BadRequestException("Email đã tồn tại");
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.EMAIL_EXISTS,
+                    message: "Email đã tồn tại",
+                });
             }
 
             const existPhone = await this.repo.findOne({
@@ -185,20 +116,23 @@ export class StaffService {
             });
 
             if (existPhone) {
-                throw new BadRequestException("Số điện thoại đã tồn tại");
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.PHONE_EXISTS,
+                    message: "Số điện thoại đã tồn tại",
+                });
             }
 
             const defaultPassword = dto.phone;
             const passwordHash = await PasswordHelper.hassPassword(defaultPassword);
 
-            
+
 
 
             const staff = this.repo.create({
                 ...dto,
                 fullName: dto.fullName,
                 passwordHash,
-                avatar: dto.avatar??null,
+                avatar: dto.avatar ?? null,
                 role: { id: dto.roleId } as any,
                 status: 1,
                 createdBy: userId,
@@ -211,9 +145,11 @@ export class StaffService {
             if (error.code === '23505' || // PostgreSQL unique violation
                 error.message.includes('Violation of UNIQUE KEY') || // SQL Server
                 error.message.includes('duplicate key')) {
-                throw new BadRequestException('Email đã tồn tại');
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.EMAIL_EXISTS,
+                    message: "Email đã tồn tại",
+                });
             }
-
             // Các lỗi khác thì throw lại
             throw error;
         }
@@ -223,19 +159,28 @@ export class StaffService {
         const staff = await this.findOne(staffId);
 
         if (!staff) {
-            throw new NotFoundException("Không tìm thấy nhân viên");
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.STAFF_NOT_FOUND,
+                message: "Không tìm thấy nhân viên",
+            });
         }
 
         if (dto.version !== staff.version) {
             throw new ConflictException(
-                'Dữ liệu đã được cập nhật bởi người khác. Vui lòng tải lại dữ liệu mới nhất!'
+                {
+                    errorCode: ERROR_CODE.VERSION_CONFLICT,
+                    message: "Xung đột version",
+                }
             );
         }
 
         if (dto.phone && dto.phone !== staff.phone) {
             const existPhone = await this.repo.findOne({ where: { phone: dto.phone, id: Not(staffId) } });
             if (existPhone) {
-                throw new BadRequestException('Số điện thoại đã được sử dụng bởi nhân viên khác');
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.STAFF_PHONE_IN_USE_BY_OTHER,
+                    message: "Số điện thoại đã được sử dụng bởi nhân viên khác",
+                });
             }
         }
 
@@ -243,7 +188,10 @@ export class StaffService {
         if (dto.email && dto.email !== staff.email) {
             const existEmail = await this.repo.findOne({ where: { email: dto.email, id: Not(staffId) } });
             if (existEmail) {
-                throw new BadRequestException('Email đã được sử dụng bởi nhân viên khác');
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.STAFF_EMAIL_IN_USE_BY_OTHER,
+                    message: "Email đã được sử dụng bởi nhân viên khác",
+                });
             }
         }
         if (dto.password && dto.password.trim().length > 0) {
@@ -258,7 +206,7 @@ export class StaffService {
             email: dto.email ?? staff.email,
             status: dto.status ?? staff.status,
             roleId: dto.roleId ?? staff.role.id,
-            avatar: dto.avatar??null,
+            avatar: dto.avatar ?? null,
             updatedBy: userId,
         });
 
@@ -275,23 +223,38 @@ export class StaffService {
         });
 
         if (!staff) {
-            throw new NotFoundException('Không tìm thấy nhân viên');
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.STAFF_NOT_FOUND,
+                message: "Không tìm thấy nhân viên",
+            });
         }
 
         if (staff.id === userId) {
-            throw new BadRequestException('Bạn không thể tự xóa tài khoản của chính mình');
+            throw new BadRequestException({
+                errorCode: ERROR_CODE.STAFF_CANNOT_DELETE_SELF,
+                message: "Không thể xóa chính mình",
+            });
         }
 
         if (staff.id === BASE_ROLE.SUPER_ADMIN.ID) {
-            throw new BadRequestException('Không thể xóa tài khoản Super Administrator');
+            throw new BadRequestException({
+                errorCode: ERROR_CODE.STAFF_CANNOT_DELETE_SUPER_ADMIN,
+                message: "Không thể xóa tài khoản có vai trò Super Administrator",
+            });
         }
 
         if (staff.role?.roleName === BASE_ROLE.SUPER_ADMIN.NAME) {
-            throw new BadRequestException('Không thể xóa tài khoản có vai trò Super Administrator');
+            throw new BadRequestException({
+                errorCode: ERROR_CODE.STAFF_CANNOT_DELETE_SUPER_ADMIN,
+                message: "Không thể xóa tài khoản có vai trò Super Administrator",
+            });
         }
 
         if (staff.status === BASE_STATUS.INACTIVE || staff.deletedAt !== undefined) {
-            throw new ConflictException('Nhân viên này đã bị xóa trước đó');
+            throw new ConflictException({
+                errorCode: ERROR_CODE.ALREADY_DELETED,
+                message: "Đã bị xóa trước đó",
+            });
         }
 
         staff.updatedBy = userId;

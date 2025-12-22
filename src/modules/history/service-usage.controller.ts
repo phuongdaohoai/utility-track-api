@@ -1,12 +1,12 @@
-import { Get, Controller, Query, UseGuards, ParseIntPipe, NotFoundException, Param } from "@nestjs/common";
+import { Get, Controller, Query, UseGuards, ParseIntPipe, Param } from "@nestjs/common";
 import ServiceUsageService from "./service-usage.service";
 import { FillerHistoryDto } from "./dto/filter-history.dto";
 import { ApiBearerAuth } from "@nestjs/swagger";
 import { JwtAuthGuard } from "src/modules/auth/guards/jwt-auth.guard";
 import { PermissionsGuard } from "src/modules/auth/guards/permissions.guard";
-import { permission } from "process";
 import { Permissions } from "src/modules/auth/decorators/permissions.decorator";
 import { ApiResponse } from "../../common/response.dto";
+import { ERROR_CODE } from "src/common/constants/error-code.constant";
 
 @Controller("history_checkin")
 @ApiBearerAuth("Authorization")
@@ -25,7 +25,7 @@ export class ServiceUsageController {
     @Get(':id')
     async getDetail(@Param('id', ParseIntPipe) id: number) {
         const data = await this.serviceUsageService.getDetail(id);
-        return ApiResponse.ok(data, "Lấy chi tiết thành công");
+        return ApiResponse.ok(data, ERROR_CODE.HISTORY_SUCCESS);
     }
 
 }

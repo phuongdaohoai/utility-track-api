@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Post, UnauthorizedException } from '@nestjs/common';
-import { PasswordHelper } from 'src/helper/password.helper';
+import { PasswordHelper } from 'src/common/helper/password.helper';
 import { JwtAuthService } from './jwt-auth.service';
 import { AuthService } from './auth.service';
 import { ApiBody, ApiResponse, ApiTags } from '@nestjs/swagger';

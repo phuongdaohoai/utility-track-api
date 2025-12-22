@@ -4,8 +4,9 @@ import { Roles } from 'src/entities/roles.entity';
 import { Repository } from 'typeorm';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthService } from './jwt-auth.service';
-import { PasswordHelper } from 'src/helper/password.helper';
+import { PasswordHelper } from 'src/common/helper/password.helper';
 import { Staffs } from 'src/entities/staffs.entity';
+import { ERROR_CODE } from 'src/common/constants/error-code.constant';
 
 @Injectable()
 export class AuthService {
@@ -26,30 +27,45 @@ export class AuthService {
         // 1. Tìm user
         const user = await this.findUserByEmail(email);
         if (!user) {
-            throw new BadRequestException("Sai tài khoản hoặc mật khẩu");
+            throw new BadRequestException({
+                errorCode: ERROR_CODE.AUTH_INVALID_CREDENTIALS,
+                message: "Sai tài khoản hoặc mật khẩu",
+            });
         }
 
         // 2. Verify password
         const match = await PasswordHelper.verifyPassword(password, user.passwordHash);
         if (!match) {
-            throw new BadRequestException("Sai tài khoản hoặc mật khẩu");
+            throw new BadRequestException({
+                errorCode: ERROR_CODE.AUTH_INVALID_PASSWORD,
+                message: "Sai mật khẩu",
+            });
         }
 
         // 3. Check role
         const roleId = user.role.id ?? 0;
         if (roleId === 0) {
-            throw new UnauthorizedException("Bạn không có quyền truy cập");
+            throw new UnauthorizedException({
+                errorCode: ERROR_CODE.AUTH_NO_ROLE_ASSIGNED,
+                message: "User không có role",
+            });
         }
 
         const role = await this.findRoleByRoleId(roleId);
         if (!role) {
-            throw new BadRequestException("Không tồn tại quyền này");
+            throw new BadRequestException({
+                errorCode: ERROR_CODE.AUTH_ROLE_NOT_FOUND,
+                message: "Role không tồn tại",
+            });
         }
 
         // 4. Lấy permissions
         const permissions = await this.getPermissions(roleId);
         if (!permissions) {
-            throw new BadRequestException("Không tồn tại quyền này");
+            throw new BadRequestException({
+                errorCode: ERROR_CODE.AUTH_NO_PERMISSIONS,
+                message: "Không có quyền truy cập",
+            });
         }
 
         // 5. Generate token

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Put, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ResidentsService } from './residents.service';
 import { ApiBearerAuth, ApiBody, ApiConsumes } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
@@ -11,7 +11,7 @@ import { CreateResidentDto } from './dto/create-resident.dto';
 import { ApiResponse } from 'src/common/response.dto';
 import { UpdateResidentDto } from './dto/update-resident.dto';
 import type { Response, Express } from 'express';
-import { ImportCsvDto } from './dto/import-csv.dto';
+import { ImportResidentsDto } from './dto/import-csv.dto';
 
 @Controller('residents')
 @ApiBearerAuth('Authorization')
@@ -38,10 +38,14 @@ export class ResidentsController {
 
     @Get('getById/:residentId')
     @Permissions('Residents.View')
-    async getById(@Param('residentId') residentId: number) {
-        const result = await this.service.findById(residentId);
-        return ApiResponse.ok(result);
+    async getById(
+        @Param('residentId', ParseIntPipe) residentId: number
+    ) {
+        return ApiResponse.ok(
+            await this.service.findById(+residentId)
+        );
     }
+
 
     @Put('update/:residentId')
     @Permissions('Residents.Update')
@@ -71,31 +75,25 @@ export class ResidentsController {
     @Get('template-csv')
     async getCsvTemplate(@Res({ passthrough: true }) res: Response) {
         const csvContent = `fullName,phone,email,citizenCard,gender,birthday,apartmentId
-                            Nguyễn Văn A,0901234567,a@gmail.com,012345678901,Nam,1990-01-01,5
-                            Trần Thị B,0912345678,b@example.com,012345678902,Nữ,1995-05-20,`;
+                        Nguyễn Văn A,0901234567,a@gmail.com,012345678901,Nam,1990-01-01,5
+                        Trần Thị B,0912345678,b@example.com,012345678902,Nữ,1995-05-20,8
+                        Lê Văn C,0923456789,,012345678903,Khác,1988-11-10,
+                        Phạm Thị D,0934567890,pham.d@example.com,012345678904,Nữ,2000-12-25,12
+                        Hoàng Văn E,0945678901,hoang.e@khuc.com,012345678905,Nam,1975-06-15,`;
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.attachment('mau-import-cu-dan.csv');
-        res.send(csvContent);
+        res.setHeader('Content-Disposition', 'attachment; filename="mau-import-cu-dan.csv"');
+        res.send('\uFEFF' + csvContent);
     }
 
-    @Post('import-csv')
+    @Post('import')
     @Permissions('Residents.Create')
-    @ApiConsumes('multipart/form-data')
-    @ApiBody({
-        type: ImportCsvDto,
-    })
-    @UseInterceptors(FileInterceptor('file', multerCsvConfig))
-    async importCsv(
-        @UploadedFile() file: Express.Multer.File,
-        @Req() req:any,
+    async importResidents(
+        @Body() body: ImportResidentsDto,
+        @Req() req: any,
     ) {
-        if (!file) {
-            throw new BadRequestException('Vui lòng upload file CSV');
-        }
-
-        const result = await this.service.importFromCsv(file, req.user.staffId);
-        return ApiResponse.ok(result, 'Import cư dân từ CSV thành công');
+        const result = await this.service.importResidents(body.residents, req.user.staffId);
+        return ApiResponse.ok(result, 'Import cư dân thành công');
     }
 }
 

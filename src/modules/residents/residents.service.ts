@@ -1,16 +1,19 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Residents } from 'src/entities/residents.entity';
-import { Brackets, Not, Repository } from 'typeorm';
+import { Brackets, In, Not, Repository } from 'typeorm';
 import { FilterResidentDto } from './dto/filter-resident.dto';
 import { PaginationResult } from 'src/common/pagination.dto';
 import { CreateResidentDto, GenderEnum } from './dto/create-resident.dto';
 import * as crypto from 'crypto';
 import { UpdateResidentDto } from './dto/update-resident.dto';
 import { BASE_STATUS } from 'src/common/constants/base-status.constant';
-import { log } from 'console';
+import { error, log } from 'console';
 import { parse } from '@fast-csv/parse';
 import { Readable } from 'stream';
+import { ImportResidentItemDto } from './dto/import-csv.dto';
+import { ERROR_CODE } from 'src/common/constants/error-code.constant';
+import { QueryBuilderHelper } from 'src/common/helper/query-builder.helper';
 interface FilterPayload {
     field: string;
     operator: string;
@@ -26,8 +29,6 @@ export class ResidentsService {
             private repo: Repository<Residents>
         ) { }
     async findAll(filter: FilterResidentDto): Promise<PaginationResult<Residents>> {
-        const page = filter.page ?? 1;
-        const pageSize = filter.pageSize ?? 10;
 
         const qb = this.repo
             .createQueryBuilder('resident')
@@ -35,117 +36,27 @@ export class ResidentsService {
             .where('resident.deletedAt IS NULL'); // Đảm bảo không lấy bản ghi đã xóa mềm
 
 
-        if (filter.search?.trim()) {
-            const search = filter.search.trim();
-            qb.andWhere(new Brackets(wb => {
-                wb.where("resident.fullName LIKE :search COLLATE SQL_Latin1_General_CP1253_CI_AI", { search: `%${search}%` })
-                    .orWhere("resident.email LIKE :search COLLATE SQL_Latin1_General_CP1253_CI_AI", { search: `%${search}%` })
-                    .orWhere("resident.phone LIKE :search COLLATE SQL_Latin1_General_CP1253_CI_AI", { search: `%${search}%` })
-                    .orWhere("apartment.roomNumber LIKE :search COLLATE SQL_Latin1_General_CP1253_CI_AI", { search: `%${search}%` });
-            }));
-        }
+        QueryBuilderHelper.applySearch(qb, filter.search?.trim(), [
+            { entityAlias: 'resident', field: 'fullName', collate: true },
+            { entityAlias: 'resident', field: 'email', collate: true },
+            { entityAlias: 'resident', field: 'phone', collate: true },
+            { entityAlias: 'apartment', field: 'roomNumber', collate: true },
+        ]);
+
+        QueryBuilderHelper.applyFilters(qb, filter.filters, {
+            // Mapping từ field FE gửi lên -> field thực trong DB
+            room: 'apartment.roomNumber',
+            joinDate: 'resident.createdAt',
+        });
+
+        qb.orderBy('resident.id', 'DESC');
 
 
-        if (filter.filters) {
-            try {
-                const filters: FilterPayload[] = typeof filter.filters === 'string'
-                    ? JSON.parse(filter.filters)
-                    : filter.filters;
-
-                if (Array.isArray(filters)) {
-                    filters.forEach((f, index) => {
-
-                        let dbField = `resident.${f.field}`;
-                        if (f.field === 'room') dbField = 'apartment.roomNumber';
-                        if (f.field === 'joinDate') dbField = 'resident.createdAt';
-                        const pName = `val_${index}_${Math.floor(Math.random() * 1000)}`;
-                        const paramName = `val_${index}_${Math.floor(Math.random() * 1000)}`;
-                        const paramName2 = `val_${index}_2_${Math.floor(Math.random() * 1000)}`;
-
-
-                        switch (f.operator) {
-                            case 'is':
-                                if (f.value === 'null' || f.value === '') {
-                                    qb.andWhere(`${dbField} IS NULL`);
-                                } else {
-                                    if (f.field === 'joinDate' || f.field === 'birthday') {
-                                        const dateStr = f.value; // YYYY-MM-DD
-                                        qb.andWhere(`${dbField} >= :${pName}_start AND ${dbField} <= :${pName}_end`, {
-                                            [`${pName}_start`]: `${dateStr} 00:00:00`,
-                                            [`${pName}_end`]: `${dateStr} 23:59:59`
-                                        });
-                                    } else {
-
-                                        qb.andWhere(`${dbField} = :${pName}`, { [pName]: f.value });
-                                    }
-                                }
-                                break;
-                            case 'contains':
-                                if (Array.isArray(f.value)) {
-                                    qb.andWhere(new Brackets(wb => {
-                                        f.value.forEach((val, i) => {
-                                            const subPName = `${pName}_${i}`;
-
-                                            wb.orWhere(`${dbField} LIKE :${subPName} COLLATE SQL_Latin1_General_CP1253_CI_AI`, { [subPName]: `%${val}%` });
-                                        });
-                                    }));
-                                } else {
-                                    qb.andWhere(`${dbField} LIKE :${pName} COLLATE SQL_Latin1_General_CP1253_CI_AI`, { [pName]: `%${f.value}%` });
-                                }
-                                break;
-                            case 'is_not':
-                                qb.andWhere(`${dbField} != :${paramName}`, { [paramName]: f.value });
-                                break;
-
-                            case 'contains':
-                                qb.andWhere(`${dbField} LIKE :${paramName}`, { [paramName]: `%${f.value}%` });
-                                break;
-
-                            case 'in':
-                                if (Array.isArray(f.value) && f.value.length > 0) {
-                                    qb.andWhere(`${dbField} IN (:...${paramName})`, { [paramName]: f.value });
-                                }
-                                break;
-
-                            case 'gt':
-                                qb.andWhere(`${dbField} > :${paramName}`, { [paramName]: f.value });
-                                break;
-
-                            case 'gte':
-                                qb.andWhere(`${dbField} >= :${paramName}`, { [paramName]: f.value });
-                                break;
-
-                            case 'lt':
-                                qb.andWhere(`${dbField} < :${paramName}`, { [paramName]: f.value });
-                                break;
-
-                            case 'lte':
-                                qb.andWhere(`${dbField} <= :${paramName}`, { [paramName]: f.value });
-                                break;
-
-                            case 'range':
-                                if (f.from !== undefined && f.to !== undefined) {
-                                    qb.andWhere(`${dbField} BETWEEN :${paramName} AND :${paramName2}`, {
-                                        [paramName]: f.from,
-                                        [paramName2]: f.to
-                                    });
-                                }
-                                break;
-                        }
-                    });
-                }
-            } catch (error) {
-                throw new BadRequestException("Lỗi parse filters" + error.message);
-            }
-        }
-
-        const totalItem = await qb.getCount();
-
-        const items = await qb
-            .skip((page - 1) * pageSize)
-            .take(pageSize)
-            .orderBy('resident.id', 'DESC')
-            .getMany();
+        const { items, totalItem, page, pageSize } = await QueryBuilderHelper.applyPagination(
+            qb,
+            filter.page ?? 1,
+            filter.pageSize ?? 10,
+        );
 
         return {
             totalItem,
@@ -155,19 +66,21 @@ export class ResidentsService {
         };
     }
     async findById(id: number) {
-        const resident = await this.repo.findOne(
-            {
-                where: { id: id },
-                relations:
-                    { apartment: true },
-                select: {
-                    apartment: {
-                        building: true,
-                        roomNumber: true,
-                        floorNumber: true,
-                    }
-                }
-            });
+        const resident = await this.repo.findOne({
+            where: {
+                id,
+            },
+            relations: {
+                apartment: true,
+            },
+        });
+
+        if (!resident) {
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.RESIDENT_NOT_FOUND,
+                message: "Không tìm thấy cư dân",
+            })
+        }
         return resident;
     }
 
@@ -180,7 +93,12 @@ export class ResidentsService {
             });
 
             if (existEmail) {
-                throw new BadRequestException("Email đã tồn tại");
+                throw new BadRequestException(
+                    {
+                        errorCode: ERROR_CODE.EMAIL_EXISTS,
+                        message: "Email đã tồn tại",
+                    }
+                );
             }
 
             const existPhone = await this.repo.findOne({
@@ -190,9 +108,24 @@ export class ResidentsService {
             });
 
             if (existPhone) {
-                throw new BadRequestException("Số điện thoại đã tồn tại");
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.PHONE_EXISTS,
+                    message: "Số điện thoại đã tồn tại",
+                });
             }
 
+            const existCitizenCard = await this.repo.findOne({
+                where: {
+                    citizenCard: dto.citizenCard,
+                }
+            });
+
+            if (existCitizenCard) {
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.CCCD_EXISTS,
+                    message: "CCCD đã tồn tại",
+                });
+            }
 
 
             const qrToken = crypto.randomBytes(32).toString('hex');
@@ -206,7 +139,7 @@ export class ResidentsService {
                 birthday: dto.birthday ? new Date(dto.birthday) : null,
                 apartment: dto.apartmentId ? { id: dto.apartmentId } as any : undefined,
                 qrCode: qrToken,
-                avatar: dto.avatar ?? null,
+                avatar: dto.avatar,
                 status: 1,
 
                 createdBy: userId,
@@ -219,10 +152,11 @@ export class ResidentsService {
             if (error.code === '23505' || // PostgreSQL unique violation
                 error.message.includes('Violation of UNIQUE KEY') || // SQL Server
                 error.message.includes('duplicate key')) {
-                throw new BadRequestException('Email đã tồn tại');
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.EMAIL_EXISTS,
+                    message: "Email đã tồn tại",
+                });
             }
-
-            // Các lỗi khác thì throw lại
             throw error;
         }
     }
@@ -231,25 +165,37 @@ export class ResidentsService {
         const resident = await this.repo.findOne({ where: { id: residentId } });
 
         if (!resident) {
-            throw new NotFoundException("Không tìm thấy cư dân");
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.RESIDENT_NOT_FOUND,
+                message: "Không tìm thấy cư dân",
+            });
         }
         log(dto.version);
         log(resident.version);
         if (dto.version !== resident.version) {
-            throw new BadRequestException("Dữ liệu đã được cập nhật bởi người khác. Vui lòng tải lại dữ liệu mới nhất!");
+            throw new BadRequestException({
+                errorCode: ERROR_CODE.VERSION_CONFLICT,
+                message: "Xung đột version",
+            });
         }
 
         if (dto.phone && dto.phone !== resident.phone) {
             const existPhone = await this.repo.findOne({ where: { phone: dto.phone } });
             if (existPhone) {
-                throw new BadRequestException("Số điện thoại đã được sử dụng bởi cư dân khác");
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.PHONE_EXISTS,
+                    message: "Số điện thoại đã tồn tại",
+                });
             }
         }
 
         if (dto.email && dto.email !== resident.email) {
             const existEmail = await this.repo.findOne({ where: { email: dto.email, id: Not(residentId) } });
             if (existEmail) {
-                throw new BadRequestException("Email đã được sử dụng bởi cư dân khác");
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.EMAIL_EXISTS,
+                    message: "Email đã tồn tại",
+                });
             }
         }
 
@@ -275,12 +221,18 @@ export class ResidentsService {
         const resident = await this.repo.findOne({ where: { id } });
 
         if (!resident) {
-            throw new NotFoundException("Không tìm thấy cư dân");
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.RESIDENT_NOT_FOUND,
+                message: "Không tìm thấy cư dân",
+            });
         }
         log(resident.status);
         log(resident.deletedAt);
         if (resident.status === BASE_STATUS.INACTIVE || resident.deletedAt !== undefined) {
-            throw new BadRequestException("Cư dân này đã bị xóa trước đó");
+            throw new BadRequestException({
+                errorCode: ERROR_CODE.ALREADY_DELETED,
+                message: "Đã bị xóa trước đó",
+            });
         }
 
         resident.deletedAt = new Date();
@@ -295,13 +247,19 @@ export class ResidentsService {
         const result = await this.repo.update(id, { qrCode: newQrToken });
 
         if (result.affected === 0) {
-            throw new NotFoundException("Không tìm thấy cư dân");
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.RESIDENT_NOT_FOUND,
+                message: "Không tìm thấy cư dân",
+            });
         }
 
         const resident = await this.repo.findOneBy({ id });
 
         if (!resident) {
-            throw new NotFoundException("Không tìm thấy cư dân");
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.RESIDENT_NOT_FOUND,
+                message: "Không tìm thấy cư dân",
+            });
         }
 
         return resident;
@@ -313,13 +271,19 @@ export class ResidentsService {
         const result = await this.repo.update(id, { faceIdData });
 
         if (result.affected === 0) {
-            throw new NotFoundException("Không tìm thấy cư dân");
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.RESIDENT_NOT_FOUND,
+                message: "Không tìm thấy cư dân",
+            });
         }
 
         const resident = await this.repo.findOneBy({ id });
 
         if (!resident) {
-            throw new NotFoundException("Không tìm thấy cư dân");
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.RESIDENT_NOT_FOUND,
+                message: "Không tìm thấy cư dân",
+            });
         }
         return resident;
     }
@@ -329,121 +293,78 @@ export class ResidentsService {
     }
 
 
-    async importFromCsv(file: Express.Multer.File, userId: number) {
+    async importResidents(dtos: ImportResidentItemDto[], userId: number) {
         const results: any[] = [];
-        const errors: { row: number; error: string }[] = [];
+        const errors: { index: number; errorCode: string; details?: any }[] = [];
 
-        const stream = Readable.from(file.buffer);
+        // Kiểm tra trùng toàn bộ trước (tối ưu)
+        const phones = dtos.map(d => d.phone);
+        const citizenCards = dtos.map(d => d.citizenCard);
+        const emails = dtos.map(d => d.email).filter(Boolean);
 
-        const parser = parse({
-            headers: true,
-            trim: true,
-            ignoreEmpty: true,
-            delimiter: ',',
-            encoding: 'utf8',
-        })
-            .validate((row: any): boolean => {
-                if (!row.fullName?.trim()) return false;
-                if (!row.phone?.trim()) return false;
-                if (!row.citizenCard?.trim()) return false;
-                if (!row.gender?.trim()) return false;
-                return true;
-            })
-            .on('data-invalid', (row, rowNumber) => {
+        const existingPhones = await this.repo.find({ where: { phone: In(phones) } });
+        const existingCccd = await this.repo.find({ where: { citizenCard: In(citizenCards) } });
+        const existingEmails = emails.length ? await this.repo.find({ where: { email: In(emails) } }) : [];
+
+        const phoneSet = new Set(existingPhones.map(r => r.phone));
+        const cccdSet = new Set(existingCccd.map(r => r.citizenCard));
+        const emailSet = new Set(existingEmails.map(r => r.email));
+
+        for (let i = 0; i < dtos.length; i++) {
+            const dto = dtos[i];
+
+            // Kiểm tra trùng
+            if (phoneSet.has(dto.phone)) {
                 errors.push({
-                    row: rowNumber,
-                    error: 'Thiếu hoặc sai các trường bắt buộc: fullName, phone, citizenCard, gender'
+                    index: i + 2,
+                    errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_PHONE,
+                    details: { phone: dto.phone },
                 });
-            })
-            .on('error', (error) => {
-                throw new BadRequestException(`Lỗi đọc file CSV: ${error.message}`);
-            })
-            .on('data-invalid', (row, rowNumber, reason) => {
-                errors.push({ row: rowNumber, error: reason || 'Dữ liệu không hợp lệ' });
-            })
-            .on('data', async (row) => {
-                parser.pause(); // ← ĐÚNG: pause PARSER
+                continue;
+            }
+            if (cccdSet.has(dto.citizenCard)) {
+                errors.push({
+                    index: i + 2,
+                    errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_CCCD,
+                    details: { citizenCard: dto.citizenCard },
+                });
+                continue;
+            }
+            if (dto.email && emailSet.has(dto.email)) {
+                errors.push({
+                    index: i + 2,
+                    errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_EMAIL,
+                    details: { email: dto.email },
+                });
+                continue;
+            }
 
-                try {
-                    const dto: CreateResidentDto = {
-                        fullName: row.fullName?.trim(),
-                        phone: row.phone?.trim(),
-                        email: row.email?.trim() || null,
-                        citizenCard: row.citizenCard?.trim(),
-                        gender: this.mapGender(row.gender?.trim()),
-                        birthday: row.birthday?.trim() || null,
-                        apartmentId: row.apartmentId ? parseInt(row.apartmentId.trim(), 10) : undefined,
-                        avatar: null,
-                    };
+            try {
+                const resident = this.repo.create({
+                    ...dto,
+                    birthday: new Date(dto.birthday),
+                    apartment: dto.apartmentId ? { id: dto.apartmentId } : undefined,
+                    qrCode: crypto.randomBytes(32).toString('hex'),
+                    avatar: null,
+                    status: 1,
+                    createdBy: userId,
+                    updatedBy: userId,
+                });
 
-                    // Kiểm tra trùng
-                    const existPhone = await this.repo.findOne({ where: { phone: dto.phone } });
-                    if (existPhone) {
-                        errors.push({ row: results.length + errors.length + 2, error: `Số điện thoại ${dto.phone} đã tồn tại` });
-                        parser.resume();
-                        return;
-                    }
-
-                    const existEmail = dto.email ? await this.repo.findOne({ where: { email: dto.email } }) : null;
-                    if (existEmail) {
-                        errors.push({ row: results.length + errors.length + 2, error: `Email ${dto.email} đã tồn tại` });
-                        parser.resume();
-                        return;
-                    }
-
-                    const existCccd = await this.repo.findOne({ where: { citizenCard: dto.citizenCard } });
-                    if (existCccd) {
-                        errors.push({ row: results.length + errors.length + 2, error: `CCCD ${dto.citizenCard} đã tồn tại` });
-                        parser.resume();
-                        return;
-                    }
-
-                    if (!dto.phone.startsWith('0') || dto.phone.length !== 10) {
-                        throw new Error('Số điện thoại phải bắt đầu bằng 0 và có 10 số');
-                    }
-
-                    if (dto.citizenCard.length !== 12 || !/^\d{12}$/.test(dto.citizenCard)) {
-                        throw new Error('CCCD phải đúng 12 chữ số');
-                    }
-                    const qrToken = crypto.randomBytes(32).toString('hex');
-                    const newResident = this.repo.create({
-                        ...dto,
-                        birthday: dto.birthday ? new Date(dto.birthday) : null,
-                        apartment: dto.apartmentId ? { id: dto.apartmentId } : undefined,
-                        qrCode: qrToken,
-                        avatar: null,
-                        status: 1,
-                        createdBy: userId,
-                        updatedBy: userId,
-                        faceIdData: null,
-                    });
-
-                    const saved = await this.repo.save(newResident);
-                    results.push({
-                        id: saved.id,
-                        fullName: saved.fullName,
-                        phone: saved.phone,
-                        email: saved.email,
-                        citizenCard: saved.citizenCard,
-                    });
-
-                } catch (err: any) {
-                    errors.push({
-                        row: results.length + errors.length + 2,
-                        error: err.message || 'Lỗi tạo cư dân',
-                    });
-                } finally {
-                    parser.resume(); // ← ĐÚNG: resume PARSER
-                }
-            });
-
-        stream.pipe(parser);
-
-        // Chờ PARSER hoàn tất, không phải stream
-        await new Promise((resolve, reject) => {
-            parser.on('end', resolve);
-            parser.on('error', reject);
-        });
+                const saved = await this.repo.save(resident);
+                results.push({
+                    id: saved.id,
+                    fullName: saved.fullName,
+                    phone: saved.phone,
+                });
+            } catch (err) {
+                errors.push({
+                    index: i + 2,
+                    errorCode: ERROR_CODE.RESIDENT_IMPORT_SAVE_ERROR,
+                    details: { message: err instanceof Error ? err.message : 'Unknown error' },
+                });
+            }
+        }
 
         return {
             successCount: results.length,
@@ -453,13 +374,6 @@ export class ResidentsService {
         };
     }
 
-    // Helper để map giới tính (vì enum là tiếng Việt)
-    private mapGender(genderStr: string): GenderEnum {
-        if (!genderStr) return GenderEnum.Other;
-        const normalized = genderStr.toLowerCase().trim();
-        if (['nam', 'male', '1'].includes(normalized)) return GenderEnum.Male;
-        if (['nữ', 'nu', 'female', '0', '2'].includes(normalized)) return GenderEnum.Female;
-        return GenderEnum.Other;
-    }
+
 }
 
