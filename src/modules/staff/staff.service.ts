@@ -1,20 +1,16 @@
 import { FilterStaffDto } from './dto/filter-staff.dto';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Injector } from '@nestjs/core/injector/injector';
 import { InjectRepository } from '@nestjs/typeorm';
-import { StaffModule } from './staff.module';
 import { Brackets, Not, Repository } from 'typeorm';
 import { PaginationResult } from 'src/common/pagination.dto';
-import { ApiResponse } from 'src/common/response.dto';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { PasswordHelper } from 'src/helper/password.helper';
 import { UpdateStaffDto } from './dto/update-staff.dto';
-import { join } from 'path';
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
 import { Staffs } from 'src/entities/staffs.entity';
 import { BASE_STATUS } from 'src/common/constants/base-status.constant';
-import { log } from 'console';
 import { BASE_ROLE } from 'src/common/constants/base-role.constant';
+import { ERROR_CODE } from 'src/common/constants/error-code.constant';
+import { error } from 'console';
 @Injectable()
 export class StaffService {
     constructor(
@@ -112,7 +108,11 @@ export class StaffService {
                     });
                 }
             } catch (error) {
-                console.error("Lỗi parse filter Staff:", error);
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.STAFF_FILTER_PARSE_ERROR,
+                    message: 'Định dạng bộ lọc không hợp lệ', 
+                    details: { error: error.message } 
+                });
             }
         }
 
@@ -156,7 +156,10 @@ export class StaffService {
             }
         });
 
-        if (!staff) throw new NotFoundException("Không tìm thấy nhân viên");
+        if (!staff) throw new NotFoundException({
+            errorCode: ERROR_CODE.STAFF_NOT_FOUND,
+            message: "Không tìm thấy nhân viên",
+        });
         return staff;
     }
 
@@ -175,7 +178,10 @@ export class StaffService {
             });
 
             if (existEmail) {
-                throw new BadRequestException("Email đã tồn tại");
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.EMAIL_EXISTS,
+                    message: "Email đã tồn tại",
+                });
             }
 
             const existPhone = await this.repo.findOne({
@@ -185,20 +191,23 @@ export class StaffService {
             });
 
             if (existPhone) {
-                throw new BadRequestException("Số điện thoại đã tồn tại");
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.PHONE_EXISTS,
+                    message: "Số điện thoại đã tồn tại",
+                });
             }
 
             const defaultPassword = dto.phone;
             const passwordHash = await PasswordHelper.hassPassword(defaultPassword);
 
-            
+
 
 
             const staff = this.repo.create({
                 ...dto,
                 fullName: dto.fullName,
                 passwordHash,
-                avatar: dto.avatar??null,
+                avatar: dto.avatar ?? null,
                 role: { id: dto.roleId } as any,
                 status: 1,
                 createdBy: userId,
@@ -211,9 +220,11 @@ export class StaffService {
             if (error.code === '23505' || // PostgreSQL unique violation
                 error.message.includes('Violation of UNIQUE KEY') || // SQL Server
                 error.message.includes('duplicate key')) {
-                throw new BadRequestException('Email đã tồn tại');
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.EMAIL_EXISTS,
+                    message: "Email đã tồn tại",
+                });
             }
-
             // Các lỗi khác thì throw lại
             throw error;
         }
@@ -223,19 +234,28 @@ export class StaffService {
         const staff = await this.findOne(staffId);
 
         if (!staff) {
-            throw new NotFoundException("Không tìm thấy nhân viên");
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.STAFF_NOT_FOUND,
+                message: "Không tìm thấy nhân viên",
+            });
         }
 
         if (dto.version !== staff.version) {
             throw new ConflictException(
-                'Dữ liệu đã được cập nhật bởi người khác. Vui lòng tải lại dữ liệu mới nhất!'
+                {
+                    errorCode: ERROR_CODE.VERSION_CONFLICT,
+                    message: "Xung đột version",
+                }
             );
         }
 
         if (dto.phone && dto.phone !== staff.phone) {
             const existPhone = await this.repo.findOne({ where: { phone: dto.phone, id: Not(staffId) } });
             if (existPhone) {
-                throw new BadRequestException('Số điện thoại đã được sử dụng bởi nhân viên khác');
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.STAFF_PHONE_IN_USE_BY_OTHER,
+                    message: "Số điện thoại đã được sử dụng bởi nhân viên khác",
+                });
             }
         }
 
@@ -243,7 +263,10 @@ export class StaffService {
         if (dto.email && dto.email !== staff.email) {
             const existEmail = await this.repo.findOne({ where: { email: dto.email, id: Not(staffId) } });
             if (existEmail) {
-                throw new BadRequestException('Email đã được sử dụng bởi nhân viên khác');
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.STAFF_EMAIL_IN_USE_BY_OTHER,
+                    message: "Email đã được sử dụng bởi nhân viên khác",
+                });
             }
         }
         if (dto.password && dto.password.trim().length > 0) {
@@ -258,7 +281,7 @@ export class StaffService {
             email: dto.email ?? staff.email,
             status: dto.status ?? staff.status,
             roleId: dto.roleId ?? staff.role.id,
-            avatar: dto.avatar??null,
+            avatar: dto.avatar ?? null,
             updatedBy: userId,
         });
 
@@ -275,23 +298,38 @@ export class StaffService {
         });
 
         if (!staff) {
-            throw new NotFoundException('Không tìm thấy nhân viên');
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.STAFF_NOT_FOUND,
+                message: "Không tìm thấy nhân viên",
+            });
         }
 
         if (staff.id === userId) {
-            throw new BadRequestException('Bạn không thể tự xóa tài khoản của chính mình');
+            throw new BadRequestException({
+                errorCode: ERROR_CODE.STAFF_CANNOT_DELETE_SELF,
+                message: "Không thể xóa chính mình",
+            });
         }
 
         if (staff.id === BASE_ROLE.SUPER_ADMIN.ID) {
-            throw new BadRequestException('Không thể xóa tài khoản Super Administrator');
+            throw new BadRequestException({
+                errorCode: ERROR_CODE.STAFF_CANNOT_DELETE_SUPER_ADMIN,
+                message: "Không thể xóa tài khoản có vai trò Super Administrator",
+            });
         }
 
         if (staff.role?.roleName === BASE_ROLE.SUPER_ADMIN.NAME) {
-            throw new BadRequestException('Không thể xóa tài khoản có vai trò Super Administrator');
+            throw new BadRequestException({
+                errorCode: ERROR_CODE.STAFF_CANNOT_DELETE_SUPER_ADMIN,
+                message: "Không thể xóa tài khoản có vai trò Super Administrator",
+            });
         }
 
         if (staff.status === BASE_STATUS.INACTIVE || staff.deletedAt !== undefined) {
-            throw new ConflictException('Nhân viên này đã bị xóa trước đó');
+            throw new ConflictException({
+                errorCode: ERROR_CODE.ALREADY_DELETED,
+                message: "Đã bị xóa trước đó",
+            });
         }
 
         staff.updatedBy = userId;

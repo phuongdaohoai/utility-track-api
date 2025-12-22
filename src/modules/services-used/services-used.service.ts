@@ -8,6 +8,7 @@ import { PaginationResult } from 'src/common/pagination.dto';
 import { FilterServiceDto } from './dto/filter-service.dto';
 import { ApiResponse } from 'src/common/response.dto';
 import { BASE_STATUS } from 'src/common/constants/base-status.constant';
+import { ERROR_CODE } from 'src/common/constants/error-code.constant';
 
 @Injectable()
 export class ServicesUsedService {
@@ -44,7 +45,10 @@ export class ServicesUsedService {
     }
     async findOne(id: number) {
         const service = await this.repo.findOne({ where: { id: id } });
-        if (!service) throw new NotFoundException("Không tìm thấy dịch vụ");
+        if (!service) throw new NotFoundException({
+            errorCode: ERROR_CODE.SERVICE_NOT_FOUND,
+            message: "Không tìm thấy dịch vụ",
+        });
         return service;
     }
 
@@ -54,7 +58,10 @@ export class ServicesUsedService {
         });
 
         if (exist) {
-            throw new BadRequestException("Tên dịch vụ đã tồn tại");
+            throw new BadRequestException({
+                errorCode: ERROR_CODE.SERVICE_NAME_EXISTS,
+                message: "Tên dịch vụ đã tồn tại",
+            });
         }
 
         const service = this.repo.create({
@@ -71,15 +78,20 @@ export class ServicesUsedService {
         });
 
         if (!service) {
-            throw new NotFoundException("Không tìm thấy dịch vụ");
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.SERVICE_NOT_FOUND,
+                message: "Không tìm thấy dịch vụ",
+            });
         }
 
         if (dto.version !== service.version) {
             throw new ConflictException(
-                'Dữ liệu đã được cập nhật bởi người khác. Vui lòng tải lại dữ liệu mới nhất!'
+                {
+                    errorCode: ERROR_CODE.VERSION_CONFLICT,
+                    message: "Xung đột version",
+                }
             );
         }
-        if (!service) throw new NotFoundException("không tìm thấy dịch vụ");
 
         if (dto.serviceName) {
             const exist = await this.repo.findOne({
@@ -89,7 +101,10 @@ export class ServicesUsedService {
                 },
             });
             if (exist) {
-                throw new ConflictException("Tên dịch vụ đã tồn tại");
+                throw new ConflictException({
+                    errorCode: ERROR_CODE.SERVICE_NAME_IN_USE_BY_OTHER,
+                    message: "Tên dịch vụ đã dùng bởi dịch vụ khác",
+                });
             }
         }
 
@@ -107,10 +122,16 @@ export class ServicesUsedService {
 
     async remove(id: number, userId: number) {
         const service = await this.findOne(id);
-        if (!service) throw new NotFoundException("không tìm thấy dịch vụ");
+        if (!service) throw new NotFoundException({
+            errorCode: ERROR_CODE.SERVICE_NOT_FOUND,
+            message: "Không tìm thấy dịch vụ",
+        });
 
         if (service.status === BASE_STATUS.INACTIVE || service.deletedAt !== undefined) {
-            throw new ConflictException("Dịch vụ này đã bị xóa trước đó");
+            throw new ConflictException({
+                errorCode: ERROR_CODE.ALREADY_DELETED,
+                message: "Đã bị xóa trước đó",
+            });
         }
         service.deletedAt = new Date();
         service.updatedBy = userId;
