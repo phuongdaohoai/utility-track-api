@@ -13,6 +13,7 @@ export const ERROR_CODE = {
     AUTH_NO_PERMISSIONS_PROVIDED: 'AUTH_NO_PERMISSIONS_PROVIDED', // User không có permissions nào
     //dashboard moudle
     //history modole
+    SERVICE_USAGE_HISTORY_NOT_FOUND: 'SERVICE_USAGE_HISTORY_NOT_FOUND', // Không tìm thấy lịch sử sử dụng dịch vụ
     // ==================== RESIDENT MODULE ====================
     RESIDENT_NOT_FOUND: 'RESIDENT_NOT_FOUND',    // Không tìm thấy cư dân theo ID  
     RESIDENT_IMPORT_DUPLICATE_PHONE: 'RESIDENT_IMPORT_DUPLICATE_PHONE', // Import cư dân bị trùng số điện thoại trong file import
@@ -35,7 +36,7 @@ export const ERROR_CODE = {
     // ==================== UPLOAD MODULE ====================
     UPLOAD_INVALID_FILES: 'UPLOAD_INVALID_FILES', //file kh hợp lệ,
     // ==================== VALIDATE CHUNG ====================
-
+    FILTER_PARSE_ERROR: 'FILTER_PARSE_ERROR', // Lỗi parse filter JSON (dùng chung mọi module)
     ALREADY_DELETED: 'ALREADY_DELETED',   // dữ liệu đã bị xoá (soft delete) trước đó   
     VERSION_CONFLICT: 'VERSION_CONFLICT',// Xung đột version (optimistic locking) – dữ liệu đã bị cập nhật bởi request khác
     PHONE_EXISTS: 'PHONE_EXISTS',  // Số điện thoại đã tồn tại trong hệ thống
@@ -44,3 +45,5 @@ export const ERROR_CODE = {
     PHONE_IN_USE_BY_OTHER: 'PHONE_IN_USE_BY_OTHER',    // Số điện thoại đang được sử dụng bởi người khác
     EMAIL_IN_USE_BY_OTHER: 'EMAIL_IN_USE_BY_OTHER',    // Email đang được sử dụng bởi người khác
 } as const;
+
+

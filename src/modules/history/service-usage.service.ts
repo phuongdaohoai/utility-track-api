@@ -4,6 +4,7 @@ import { FillerHistoryDto } from "./dto/filter-history.dto";
 import { Repository } from "typeorm";
 import { Brackets } from 'typeorm';
 import { ServiceUsageHistories } from "src/entities/service-usage-histories.entity";
+import { QueryBuilderHelper } from "src/common/helper/query-builder.helper";
 
 
 @Injectable()
@@ -14,7 +15,6 @@ export default class ServiceUsageService {
     ) { }
 
     async getHistory(filter: FillerHistoryDto) {
-        const { searchName, serviceId, page = 1, limit = 10 } = filter;
 
         const query = this.repo.createQueryBuilder("history")
             .leftJoinAndSelect("history.resident", "resident")
@@ -22,35 +22,26 @@ export default class ServiceUsageService {
             .leftJoinAndSelect("history.staff", "staff")
             .orderBy("history.usageTime", "DESC");
         // Loc theo ten cu dan  
-        if (searchName) {
-            query.andWhere(
-                new Brackets((qb) => {
-                    qb.where("resident.fullName LIKE :name", { name: `%${searchName}%` })
-                        .orWhere("service.serviceName LIKE :name", { name: `%${searchName}%` })
-                })
-            );
+        QueryBuilderHelper.applySearch(query, filter.searchName?.trim(), [
+            { entityAlias: 'resident', field: 'fullName', collate: true },
+            { entityAlias: 'service', field: 'serviceName', collate: true },
+        ]);
 
-        }
-        //Phan trang
-        let pageNum = Number(page) > 0 ? Number(page) : 1;
-        const limitNum = Number(limit) > 0 ? Number(limit) : 10;
-        const skip = (pageNum - 1) * limitNum;
+        query.orderBy('history.usageTime', 'DESC');
 
-        query.skip(skip).take(limitNum);
-        let [data, total] = await query.getManyAndCount();
-        const totalPages = Math.ceil(total / limitNum);
-        if (total > 0 && pageNum > totalPages) {
-            query.skip(0).take(limitNum);
-            data = await query.getMany();
-            pageNum = 1;
-        }
+        // 4. Phân trang
+        const { items, totalItem, page, pageSize } = await QueryBuilderHelper.applyPagination(
+            query,
+            filter.page ?? 1,
+            filter.limit ?? 10,
+        );
+
         return {
-            data,
-            total,
-            limit: limitNum,
-            page: Number(page),
-            totalPages: Math.ceil(total / Number(limitNum)),
-        }
+            items,
+            totalItem,
+            page,
+            pageSize,
+        };
     }
 
     async getDetail(id: number) {
