@@ -23,6 +23,7 @@ export const ERROR_CODE = {
   
     SERVICE_USAGE_HISTORY_NOT_FOUND: 'SERVICE_USAGE_HISTORY_NOT_FOUND', // Không tìm thấy lịch sử sử dụng dịch vụ
 
+    
     // ==================== RESIDENT MODULE ====================
     RESIDENT_NOT_FOUND: 'RESIDENT_NOT_FOUND',    // Không tìm thấy cư dân theo ID  
     RESIDENT_IMPORT_DUPLICATE_PHONE: 'RESIDENT_IMPORT_DUPLICATE_PHONE', // Import cư dân bị trùng số điện thoại trong file import
