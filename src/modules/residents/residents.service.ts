@@ -12,6 +12,7 @@ import { log } from 'console';
 import { parse } from '@fast-csv/parse';
 import { Readable } from 'stream';
 import { ImportResidentItemDto } from './dto/import-csv.dto';
+import { ERROR_CODE } from 'src/common/constants/error-code.constant';
 interface FilterPayload {
     field: string;
     operator: string;
@@ -136,7 +137,10 @@ export class ResidentsService {
                     });
                 }
             } catch (error) {
-                throw new BadRequestException("Lỗi parse filters" + error.message);
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.RESIDENT_FILTER_PARSE_ERROR,
+                    message: "Lỗi parse filter: " + error.message,
+                });
             }
         }
 
@@ -181,7 +185,12 @@ export class ResidentsService {
             });
 
             if (existEmail) {
-                throw new BadRequestException("Email đã tồn tại");
+                throw new BadRequestException(
+                    {
+                        errorCode: ERROR_CODE.EMAIL_EXISTS,
+                        message: "Email đã tồn tại",
+                    }
+                );
             }
 
             const existPhone = await this.repo.findOne({
@@ -191,7 +200,10 @@ export class ResidentsService {
             });
 
             if (existPhone) {
-                throw new BadRequestException("Số điện thoại đã tồn tại");
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.PHONE_EXISTS,
+                    message: "Số điện thoại đã tồn tại",
+                });
             }
 
             const existCitizenCard = await this.repo.findOne({
@@ -201,7 +213,10 @@ export class ResidentsService {
             });
 
             if (existCitizenCard) {
-                throw new BadRequestException("CCCD đã tồn tại");
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.CCCD_EXISTS,
+                    message: "CCCD đã tồn tại",
+                });
             }
 
 
@@ -229,10 +244,11 @@ export class ResidentsService {
             if (error.code === '23505' || // PostgreSQL unique violation
                 error.message.includes('Violation of UNIQUE KEY') || // SQL Server
                 error.message.includes('duplicate key')) {
-                throw new BadRequestException('Email đã tồn tại');
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.EMAIL_EXISTS,
+                    message: "Email đã tồn tại",
+                });
             }
-
-            // Các lỗi khác thì throw lại
             throw error;
         }
     }
@@ -241,25 +257,37 @@ export class ResidentsService {
         const resident = await this.repo.findOne({ where: { id: residentId } });
 
         if (!resident) {
-            throw new NotFoundException("Không tìm thấy cư dân");
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.RESIDENT_NOT_FOUND,
+                message: "Không tìm thấy cư dân",
+            });
         }
         log(dto.version);
         log(resident.version);
         if (dto.version !== resident.version) {
-            throw new BadRequestException("Dữ liệu đã được cập nhật bởi người khác. Vui lòng tải lại dữ liệu mới nhất!");
+            throw new BadRequestException({
+                errorCode: ERROR_CODE.VERSION_CONFLICT,
+                message: "Xung đột version",
+            });
         }
 
         if (dto.phone && dto.phone !== resident.phone) {
             const existPhone = await this.repo.findOne({ where: { phone: dto.phone } });
             if (existPhone) {
-                throw new BadRequestException("Số điện thoại đã được sử dụng bởi cư dân khác");
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.PHONE_EXISTS,
+                    message: "Số điện thoại đã tồn tại",
+                });
             }
         }
 
         if (dto.email && dto.email !== resident.email) {
             const existEmail = await this.repo.findOne({ where: { email: dto.email, id: Not(residentId) } });
             if (existEmail) {
-                throw new BadRequestException("Email đã được sử dụng bởi cư dân khác");
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.EMAIL_EXISTS,
+                    message: "Email đã tồn tại",
+                });
             }
         }
 
@@ -285,12 +313,18 @@ export class ResidentsService {
         const resident = await this.repo.findOne({ where: { id } });
 
         if (!resident) {
-            throw new NotFoundException("Không tìm thấy cư dân");
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.RESIDENT_NOT_FOUND,
+                message: "Không tìm thấy cư dân",
+            });
         }
         log(resident.status);
         log(resident.deletedAt);
         if (resident.status === BASE_STATUS.INACTIVE || resident.deletedAt !== undefined) {
-            throw new BadRequestException("Cư dân này đã bị xóa trước đó");
+            throw new BadRequestException({
+                errorCode: ERROR_CODE.ALREADY_DELETED,
+                message: "Đã bị xóa trước đó",
+            });
         }
 
         resident.deletedAt = new Date();
@@ -305,13 +339,19 @@ export class ResidentsService {
         const result = await this.repo.update(id, { qrCode: newQrToken });
 
         if (result.affected === 0) {
-            throw new NotFoundException("Không tìm thấy cư dân");
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.RESIDENT_NOT_FOUND,
+                message: "Không tìm thấy cư dân",
+            });
         }
 
         const resident = await this.repo.findOneBy({ id });
 
         if (!resident) {
-            throw new NotFoundException("Không tìm thấy cư dân");
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.RESIDENT_NOT_FOUND,
+                message: "Không tìm thấy cư dân",
+            });
         }
 
         return resident;
@@ -323,13 +363,19 @@ export class ResidentsService {
         const result = await this.repo.update(id, { faceIdData });
 
         if (result.affected === 0) {
-            throw new NotFoundException("Không tìm thấy cư dân");
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.RESIDENT_NOT_FOUND,
+                message: "Không tìm thấy cư dân",
+            });
         }
 
         const resident = await this.repo.findOneBy({ id });
 
         if (!resident) {
-            throw new NotFoundException("Không tìm thấy cư dân");
+            throw new NotFoundException({
+                errorCode: ERROR_CODE.RESIDENT_NOT_FOUND,
+                message: "Không tìm thấy cư dân",
+            });
         }
         return resident;
     }
@@ -341,7 +387,7 @@ export class ResidentsService {
 
     async importResidents(dtos: ImportResidentItemDto[], userId: number) {
         const results: any[] = [];
-        const errors: { index: number; error: string }[] = [];
+        const errors: { index: number; errorCode: string; details?: any }[] = [];
 
         // Kiểm tra trùng toàn bộ trước (tối ưu)
         const phones = dtos.map(d => d.phone);
@@ -361,15 +407,27 @@ export class ResidentsService {
 
             // Kiểm tra trùng
             if (phoneSet.has(dto.phone)) {
-                errors.push({ index: i + 2, error: `Số điện thoại ${dto.phone} đã tồn tại` });
+                errors.push({
+                    index: i + 2,
+                    errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_PHONE,
+                    details: { phone: dto.phone },
+                });
                 continue;
             }
             if (cccdSet.has(dto.citizenCard)) {
-                errors.push({ index: i + 2, error: `CCCD ${dto.citizenCard} đã tồn tại` });
+                errors.push({
+                    index: i + 2,
+                    errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_CCCD,
+                    details: { citizenCard: dto.citizenCard },
+                });
                 continue;
             }
             if (dto.email && emailSet.has(dto.email)) {
-                errors.push({ index: i + 2, error: `Email ${dto.email} đã tồn tại` });
+                errors.push({
+                    index: i + 2,
+                    errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_EMAIL,
+                    details: { email: dto.email },
+                });
                 continue;
             }
 
@@ -392,7 +450,11 @@ export class ResidentsService {
                     phone: saved.phone,
                 });
             } catch (err) {
-                errors.push({ index: i + 2, error: 'Lỗi lưu dữ liệu' });
+                errors.push({
+                    index: i + 2,
+                    errorCode: ERROR_CODE.RESIDENT_IMPORT_SAVE_ERROR,
+                    details: { message: err instanceof Error ? err.message : 'Unknown error' },
+                });
             }
         }
 
