@@ -11,10 +11,11 @@ import { BASE_STATUS } from 'src/common/constants/base-status.constant';
 import { BASE_ROLE } from 'src/common/constants/base-role.constant';
 import { ERROR_CODE } from 'src/common/constants/error-code.constant';
 import { error } from 'console';
-import { QueryBuilderHelper } from 'src/common/helper/query-builder.helper';
+import { QueryHelper } from 'src/common/helper/query.helper';
 import { ImportStaffItemDto } from './dto/import-staff.dto';
 import * as bcrypt from 'bcrypt';
 import { Roles } from 'src/entities/roles.entity';
+
 @Injectable()
 export class StaffService {
     constructor(
@@ -22,42 +23,22 @@ export class StaffService {
         private repo: Repository<Staffs>
     ) { }
 
-    async findAll(filter: FilterStaffDto): Promise<PaginationResult<Staffs>> {
-
+async findAll(filter: FilterStaffDto) {
         const qb = this.repo.createQueryBuilder('staff')
             .leftJoin('staff.role', 'role')
-            .addSelect(['role.roleName', 'role.id']) // Lấy thêm ID để map filter
-            .where('staff.deletedAt IS NULL'); // Chỉ lấy chưa xóa
+            .addSelect(['role.roleName', 'role.id'])
+            .where('staff.deletedAt IS NULL');
 
-        // Tìm kiếm chung (họ tên, email, phone)
-        QueryBuilderHelper.applySearch(qb, filter.search?.trim(), [
-            { entityAlias: 'staff', field: 'fullName', collate: true },
-            { entityAlias: 'staff', field: 'email', collate: true },
-            { entityAlias: 'staff', field: 'phone', collate: true },
-        ]);
-
-        // Filter động (roleId, createdAt, status...)
-        QueryBuilderHelper.applyFilters(qb, filter.filters, {
-            roleId: 'role.id',
-            createdAt: 'staff.createdAt',
+        return await QueryHelper.apply(qb, filter, {
+            alias: 'staff',
+            searchFields: ['staff.fullName', 'staff.email', 'staff.phone'],
+            fieldMap: {
+                'roleId': 'role.id',
+                'createdAt': 'staff.createdAt'
+            },
+            // Chỉ định trường ngày tháng
+            dateFields: ['createdAt', 'updatedAt']
         });
-
-        // Sắp xếp theo mới nhất
-        qb.orderBy('staff.id', 'DESC');
-
-        // Phân trang
-        const { items, totalItem, page, pageSize } = await QueryBuilderHelper.applyPagination(
-            qb,
-            filter.page ?? 1,
-            filter.pageSize ?? 10,
-        );
-
-        return {
-            totalItem,
-            page,
-            pageSize,
-            items
-        };
     }
     async findOne(id: number) {
         const staff = await this.repo.findOne({

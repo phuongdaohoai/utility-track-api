@@ -13,7 +13,8 @@ import { parse } from '@fast-csv/parse';
 import { Readable } from 'stream';
 import { ImportResidentItemDto } from './dto/import-csv.dto';
 import { ERROR_CODE } from 'src/common/constants/error-code.constant';
-import { QueryBuilderHelper } from 'src/common/helper/query-builder.helper';
+import { QueryHelper } from 'src/common/helper/query.helper';
+
 interface FilterPayload {
     field: string;
     operator: string;
@@ -28,42 +29,39 @@ export class ResidentsService {
             @InjectRepository(Residents)
             private repo: Repository<Residents>
         ) { }
-    async findAll(filter: FilterResidentDto): Promise<PaginationResult<Residents>> {
-
-        const qb = this.repo
-            .createQueryBuilder('resident')
+    async findAll(filter: FilterResidentDto) {
+        // 1. Dựng QueryBuilder cơ bản (Join bảng)
+        const qb = this.repo.createQueryBuilder('resident')
             .leftJoinAndSelect('resident.apartment', 'apartment')
-            .where('resident.deletedAt IS NULL'); // Đảm bảo không lấy bản ghi đã xóa mềm
+            .where('resident.deletedAt IS NULL'); // Giữ logic chưa xóa mềm
 
+        // 2. Gọi Helper để xử lý phần còn lại
+        return await QueryHelper.apply(qb, filter, {
+            alias: 'resident',
 
-        QueryBuilderHelper.applySearch(qb, filter.search?.trim(), [
-            { entityAlias: 'resident', field: 'fullName', collate: true },
-            { entityAlias: 'resident', field: 'email', collate: true },
-            { entityAlias: 'resident', field: 'phone', collate: true },
-            { entityAlias: 'apartment', field: 'roomNumber', collate: true },
-        ]);
+            // Các trường tìm kiếm chung (Search Box)
+            searchFields: [
+                'resident.fullName',
+                'resident.email',
+                'resident.phone',
+                'apartment.roomNumber'
+            ],
 
-        QueryBuilderHelper.applyFilters(qb, filter.filters, {
-            // Mapping từ field FE gửi lên -> field thực trong DB
-            room: 'apartment.roomNumber',
-            joinDate: 'resident.createdAt',
+            // Mapping tên từ Frontend -> DB
+            fieldMap: {
+                'room': 'apartment.roomNumber',
+                'joinDate': 'resident.createdAt', // Map joinDate vào createdAt
+                'birthday': 'resident.birthday',
+                // Map rõ ràng các trường khác để tránh nhầm lẫn
+                'fullName': 'resident.fullName',
+                'email': 'resident.email',
+                'phone': 'resident.phone',
+                'status': 'resident.status'
+            },
+
+            // 🔥 QUAN TRỌNG: Danh sách các trường cần xử lý logic ngày (00:00 -> 23:59)
+            dateFields: ['joinDate', 'birthday', 'createdAt']
         });
-
-        qb.orderBy('resident.id', 'DESC');
-
-
-        const { items, totalItem, page, pageSize } = await QueryBuilderHelper.applyPagination(
-            qb,
-            filter.page ?? 1,
-            filter.pageSize ?? 10,
-        );
-
-        return {
-            totalItem,
-            page,
-            pageSize,
-            items
-        };
     }
     async findById(id: number) {
         const resident = await this.repo.findOne({
