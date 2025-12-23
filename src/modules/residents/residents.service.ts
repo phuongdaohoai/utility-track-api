@@ -14,7 +14,8 @@ import { Readable } from 'stream';
 import { ImportResidentItemDto } from './dto/import-csv.dto';
 import { ERROR_CODE } from 'src/common/constants/error-code.constant';
 import { QueryHelper } from 'src/common/helper/query.helper';
-
+import { validate } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
 interface FilterPayload {
     field: string;
     operator: string;
@@ -295,10 +296,10 @@ export class ResidentsService {
         const results: any[] = [];
         const errors: { index: number; errorCode: string; details?: any }[] = [];
 
-        // Kiểm tra trùng toàn bộ trước (tối ưu)
-        const phones = dtos.map(d => d.phone);
-        const citizenCards = dtos.map(d => d.citizenCard);
-        const emails = dtos.map(d => d.email).filter(Boolean);
+        // 1. Lấy dữ liệu để check trùng (Pre-fetch)
+        const phones = dtos.map(d => d.phone ? d.phone.toString().trim() : '').filter(Boolean);
+        const citizenCards = dtos.map(d => d.citizenCard ? d.citizenCard.toString().trim() : '').filter(Boolean);
+        const emails = dtos.map(d => d.email ? d.email.toString().trim() : '').filter(Boolean);
 
         const existingPhones = await this.repo.find({ where: { phone: In(phones) } });
         const existingCccd = await this.repo.find({ where: { citizenCard: In(citizenCards) } });
@@ -310,38 +311,112 @@ export class ResidentsService {
 
         for (let i = 0; i < dtos.length; i++) {
             const dto = dtos[i];
+            const rowIndex = i + 2;
 
-            // Kiểm tra trùng
-            if (phoneSet.has(dto.phone)) {
-                errors.push({
-                    index: i + 2,
-                    errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_PHONE,
-                    details: { phone: dto.phone },
-                });
-                continue;
+            // --- A. CHUẨN HÓA DỮ LIỆU (CLEAN DATA) ---
+            const cleanPhone = dto.phone ? dto.phone.toString().trim() : '';
+            const cleanEmail = dto.email ? dto.email.toString().trim() : '';
+            const cleanCccd = dto.citizenCard ? dto.citizenCard.toString().trim() : '';
+            
+            // Xử lý Ngày sinh: Hỗ trợ cả YYYY-MM-DD và DD/MM/YYYY
+            let cleanBirthday = '';
+            const rawBirthday = dto.birthday ? dto.birthday.toString().trim() : '';
+            
+            if (rawBirthday) {
+                // Nếu là dạng ISO (1990-01-01)
+                if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(rawBirthday)) {
+                    cleanBirthday = rawBirthday;
+                } 
+                // Nếu là dạng VN (01/01/1990)
+                else if (rawBirthday.includes('/')) {
+                    const parts = rawBirthday.split('/');
+                    if (parts.length === 3) {
+                        // Chuyển thành YYYY-MM-DD (đảm bảo thêm số 0 nếu thiếu)
+                        const day = parts[0].padStart(2, '0');
+                        const month = parts[1].padStart(2, '0');
+                        const year = parts[2];
+                        cleanBirthday = `${year}-${month}-${day}`;
+                    }
+                }
             }
-            if (cccdSet.has(dto.citizenCard)) {
-                errors.push({
-                    index: i + 2,
-                    errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_CCCD,
-                    details: { citizenCard: dto.citizenCard },
-                });
-                continue;
+
+            // Xử lý Giới tính
+            let cleanGender = GenderEnum.Other;
+            const genderStr = dto.gender ? dto.gender.toString().toLowerCase().trim() : '';
+            if (['nam', 'male', 'trai', 'Nam'].includes(genderStr)) cleanGender = GenderEnum.Male;
+            if (['nữ', 'nu', 'female', 'gái', 'Nữ'].includes(genderStr)) cleanGender = GenderEnum.Female;
+
+
+            // --- B. VALIDATE THỦ CÔNG (LOGIC CỨNG) ---
+            
+            // 1. Validate Ngày sinh
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+            if (!cleanBirthday || !dateRegex.test(cleanBirthday) || isNaN(new Date(cleanBirthday).getTime())) {
+                 errors.push({ index: rowIndex, errorCode: 'FORMAT_ERROR', details: { field: 'birthday', message: `Ngày sinh không hợp lệ: "${rawBirthday}" (Yêu cầu: YYYY-MM-DD hoặc DD/MM/YYYY)` } });
+                 continue;
             }
-            if (dto.email && emailSet.has(dto.email)) {
-                errors.push({
-                    index: i + 2,
-                    errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_EMAIL,
-                    details: { email: dto.email },
-                });
+
+            // 2. Validate SĐT (VN)
+            if (!/^(0|\+84)\d{9,10}$/.test(cleanPhone)) {
+                errors.push({ index: rowIndex, errorCode: 'FORMAT_ERROR', details: { field: 'phone', message: 'SĐT không đúng định dạng (VN)' } });
                 continue;
             }
 
+            // 3. Validate CCCD (12 số)
+            if (!/^\d{12}$/.test(cleanCccd)) {
+                errors.push({ index: rowIndex, errorCode: 'FORMAT_ERROR', details: { field: 'citizenCard', message: 'CCCD phải có đúng 12 chữ số' } });
+                continue;
+            }
+
+            // --- C. VALIDATE DTO (Dùng class-validator cho các trường còn lại như Email) ---
+            const residentValidateObj = plainToInstance(CreateResidentDto, {
+                ...dto,
+                fullName: dto.fullName,
+                phone: cleanPhone,
+                citizenCard: cleanCccd,
+                gender: cleanGender,
+                // Trick: Email rỗng -> undefined để bỏ qua check
+                email: cleanEmail !== '' ? cleanEmail : undefined,
+                apartmentId: dto.apartmentId ? Number(dto.apartmentId) : undefined,
+                // 🔥 Trick: Truyền undefined vào birthday để DTO KHÔNG CHECK LẠI (vì ta đã check tay rồi)
+                birthday: undefined 
+            });
+
+            // Chỉ lấy lỗi không phải birthday
+            const validationErrors = await validate(residentValidateObj);
+            const realErrors = validationErrors.filter(err => err.property !== 'birthday');
+
+            if (realErrors.length > 0) {
+                const firstError = realErrors[0];
+                const message = firstError.constraints ? Object.values(firstError.constraints)[0] : 'Lỗi định dạng';
+                errors.push({ index: rowIndex, errorCode: 'FORMAT_ERROR', details: { field: firstError.property, message: message } });
+                continue; 
+            }
+
+            // --- D. CHECK TRÙNG ---
+            if (phoneSet.has(cleanPhone)) {
+                errors.push({ index: rowIndex, errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_PHONE, details: { phone: cleanPhone } });
+                continue;
+            }
+            if (cccdSet.has(cleanCccd)) {
+                errors.push({ index: rowIndex, errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_CCCD, details: { citizenCard: cleanCccd } });
+                continue;
+            }
+            if (cleanEmail && emailSet.has(cleanEmail)) {
+                errors.push({ index: rowIndex, errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_EMAIL, details: { email: cleanEmail } });
+                continue;
+            }
+
+            // --- E. LƯU VÀO DB ---
             try {
                 const resident = this.repo.create({
-                    ...dto,
-                    birthday: new Date(dto.birthday),
-                    apartment: dto.apartmentId ? { id: dto.apartmentId } : undefined,
+                    fullName: dto.fullName,
+                    phone: cleanPhone,
+                    citizenCard: cleanCccd,
+                    email: cleanEmail || null,
+                    gender: cleanGender,
+                    birthday: new Date(cleanBirthday), // Lúc này mới tạo Date Object an toàn
+                    apartment: dto.apartmentId ? { id: Number(dto.apartmentId) } : undefined,
                     qrCode: crypto.randomBytes(32).toString('hex'),
                     avatar: null,
                     status: 1,
@@ -350,17 +425,9 @@ export class ResidentsService {
                 });
 
                 const saved = await this.repo.save(resident);
-                results.push({
-                    id: saved.id,
-                    fullName: saved.fullName,
-                    phone: saved.phone,
-                });
+                results.push({ id: saved.id, fullName: saved.fullName, phone: saved.phone });
             } catch (err) {
-                errors.push({
-                    index: i + 2,
-                    errorCode: ERROR_CODE.RESIDENT_IMPORT_SAVE_ERROR,
-                    details: { message: err instanceof Error ? err.message : 'Unknown error' },
-                });
+                 errors.push({ index: rowIndex, errorCode: ERROR_CODE.RESIDENT_IMPORT_SAVE_ERROR, details: { message: err instanceof Error ? err.message : 'Unknown error' } });
             }
         }
 
