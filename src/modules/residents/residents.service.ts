@@ -16,6 +16,8 @@ import { ERROR_CODE } from 'src/common/constants/error-code.constant';
 import { QueryHelper } from 'src/common/helper/query.helper';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
+import archiver from 'archiver';
+import { ApartmentService } from '../apartment/apartment.service';
 interface FilterPayload {
     field: string;
     operator: string;
@@ -28,7 +30,9 @@ export class ResidentsService {
     constructor
         (
             @InjectRepository(Residents)
-            private repo: Repository<Residents>
+            private repo: Repository<Residents>,
+
+            private apartmentService: ApartmentService,
         ) { }
     async findAll(filter: FilterResidentDto) {
         // 1. Dựng QueryBuilder cơ bản (Join bảng)
@@ -439,6 +443,33 @@ export class ResidentsService {
         };
     }
 
+    async generateTemplateZip() {
+        // 1. Khởi tạo archiver
+        const archive = archiver('zip', { zlib: { level: 9 } });
 
+        // 2. Tạo nội dung file mẫu nhập liệu (CSV 1)
+        const csvTemplate = `fullName,phone,email,citizenCard,gender,birthday,apartmentId
+                            Nguyễn Văn A,0901234567,a@gmail.com,012345678901,Nam,1990-01-01,5
+                            Trần Thị B,0912345678,b@example.com,012345678902,Nữ,1995-05-20,8
+                            Lê Văn C,0923456789,,012345678903,Khác,1988-11-10,
+                            Phạm Thị D,0934567890,pham.d@example.com,012345678904,Nữ,2000-12-25,12
+                            Hoàng Văn E,0945678901,hoang.e@khuc.com,012345678905,Nam,1975-06-15,`;
+
+        archive.append('\uFEFF' + csvTemplate, { name: '1-mau-import-cu-dan.csv' });
+
+        // 3. Lấy dữ liệu 500 phòng từ ApartmentService và tạo CSV 2
+        const apartments = await this.apartmentService.findAll();
+        let apartmentListContent = `apartmentId (Mã nhập liệu),Tòa/Block,Phòng,Tầng\n`;
+
+        apartments.forEach(item => {
+            // Thay đổi property .id, .name cho đúng với thực tế DB của bạn
+            apartmentListContent += `${item.id},${item.building},${item.roomNumber || ''},${item.floorNumber}\n`;
+        });
+
+        archive.append('\uFEFF' + apartmentListContent, { name: '2-danh-sach-phong-tra-cuu.csv' });
+
+        // Trả về đối tượng archive để Controller pipe vào Response
+        return archive;
+    }
 }
 

@@ -7,6 +7,7 @@ import { Apartments } from 'src/entities/apartments.entity';
 @Module({
   imports: [TypeOrmModule.forFeature([Apartments])],
   controllers: [ApartmentController],
-  providers: [ApartmentService]
+  providers: [ApartmentService],
+  exports: [ApartmentService],
 })
-export class ApartmentModule {}
+export class ApartmentModule { }
