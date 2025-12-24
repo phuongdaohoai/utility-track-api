@@ -10,29 +10,29 @@ export class ImportResidentItemDto {
     fullName: string;
 
     @ApiProperty()
-    @IsString() // 🟢 QUAN TRỌNG: Chỉ check chuỗi, không check format SĐT ở đây
+    @IsString() 
     phone: string;
 
     @ApiProperty({ required: false })
     @IsOptional()
-    @IsString() // 🟢 QUAN TRỌNG: Chỉ check chuỗi, không check format Email ở đây
+    @IsString() 
     email?: string;
 
     @ApiProperty()
-    @IsString() // 🟢 QUAN TRỌNG: Bỏ Regex CCCD ở đây
+    @IsString() 
     citizenCard: string;
 
     @ApiProperty()
-    @IsString() // 🟢 QUAN TRỌNG: Để string để nhận cả "Nam", "Nữ", "Male"...
+    @IsString()
     gender: string;
 
     @ApiProperty()
-    @IsString() // 🟢 QUAN TRỌNG: Bỏ IsDateString để nhận cả "DD/MM/YYYY"
+    @IsString() 
     birthday: string;
 
     @ApiProperty({ required: false })
     @IsOptional()
-    apartmentId?: any; // Để any để tránh lỗi type number/string
+    apartmentId?: any;
 }
 
 export class ImportResidentsDto {
