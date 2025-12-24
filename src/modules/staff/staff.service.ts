@@ -23,7 +23,7 @@ export class StaffService {
         private repo: Repository<Staffs>
     ) { }
 
-async findAll(filter: FilterStaffDto) {
+    async findAll(filter: FilterStaffDto) {
         const qb = this.repo.createQueryBuilder('staff')
             .leftJoin('staff.role', 'role')
             .addSelect(['role.roleName', 'role.id'])
@@ -255,7 +255,12 @@ async findAll(filter: FilterStaffDto) {
         const emails = dtos.map(d => d.email.toLowerCase().trim());
         const phones = dtos.map(d => d.phone).filter(Boolean);
 
-        const existingEmails = await this.repo.find({ where: { email: In(emails) } });
+        const existingEmails = await this.repo
+            .createQueryBuilder('staff')
+            .select(['staff.email'])
+            .where('staff.email IN (:...emails)', { emails })
+            .andWhere('staff.deletedAt IS NULL')
+            .getMany();
         const existingPhones = phones.length ? await this.repo.find({ where: { phone: In(phones) } }) : [];
 
         const emailSet = new Set(existingEmails.map(s => s.email.toLowerCase()));
