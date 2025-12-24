@@ -13,7 +13,7 @@ export class JwtAuthService {
         this.key = process.env.JWT_SECRET!;
         this.issuer = process.env.JWT_ISSUER!;
         this.audience = process.env.JWT_AUDIENCE!;
-        this.minutes = Number(process.env.JWT_EXPIRE_MINUTE || 500);
+        this.minutes = Number(process.env.JWT_EXPIRE_MINUTES || 60);
     }
 
     generateToken(userLogin: any, role: string, permissions: string[]) {
