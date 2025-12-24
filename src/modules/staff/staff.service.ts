@@ -150,16 +150,16 @@ export class StaffService {
         }
 
         if (dto.version !== staff.version) {
-            throw new ConflictException(
-                {
-                    errorCode: ERROR_CODE.VERSION_CONFLICT,
-                    message: "Xung đột version",
-                }
-            );
+            throw new ConflictException({
+                errorCode: ERROR_CODE.VERSION_CONFLICT,
+                message: "Xung đột version",
+            });
         }
 
         if (dto.phone && dto.phone !== staff.phone) {
-            const existPhone = await this.repo.findOne({ where: { phone: dto.phone, id: Not(staffId) } });
+            const existPhone = await this.repo.findOne({
+                where: { phone: dto.phone, id: Not(staffId) },
+            });
             if (existPhone) {
                 throw new BadRequestException({
                     errorCode: ERROR_CODE.STAFF_PHONE_IN_USE_BY_OTHER,
@@ -168,9 +168,10 @@ export class StaffService {
             }
         }
 
-        // Kiểm tra trùng email mới (nếu thay đổi)
         if (dto.email && dto.email !== staff.email) {
-            const existEmail = await this.repo.findOne({ where: { email: dto.email, id: Not(staffId) } });
+            const existEmail = await this.repo.findOne({
+                where: { email: dto.email, id: Not(staffId) },
+            });
             if (existEmail) {
                 throw new BadRequestException({
                     errorCode: ERROR_CODE.STAFF_EMAIL_IN_USE_BY_OTHER,
@@ -178,10 +179,9 @@ export class StaffService {
                 });
             }
         }
-        if (dto.password && dto.password.trim().length > 0) {
-            // Hash password mới và gán vào entity
-            const newPasswordHash = await PasswordHelper.hassPassword(dto.password);
-            staff.passwordHash = newPasswordHash;
+
+        if (dto.password?.trim()) {
+            staff.passwordHash = await PasswordHelper.hassPassword(dto.password);
         }
 
         Object.assign(staff, {
@@ -189,14 +189,17 @@ export class StaffService {
             phone: dto.phone ?? staff.phone,
             email: dto.email ?? staff.email,
             status: dto.status ?? staff.status,
-            roleId: dto.roleId ?? staff.role.id,
-            avatar: dto.avatar ?? null,
+            avatar: dto.avatar ?? staff.avatar,
             updatedBy: userId,
         });
 
-        return await this.repo.save(staff);
+        if (dto.roleId && dto.roleId !== staff.role?.id) {
+            staff.role = { id: dto.roleId } as any;
+        }
 
+        return await this.repo.save(staff);
     }
+
 
     async remove(id: number, userId: number) {
 
