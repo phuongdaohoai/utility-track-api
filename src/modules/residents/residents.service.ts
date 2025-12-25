@@ -13,7 +13,11 @@ import { parse } from '@fast-csv/parse';
 import { Readable } from 'stream';
 import { ImportResidentItemDto } from './dto/import-csv.dto';
 import { ERROR_CODE } from 'src/common/constants/error-code.constant';
-import { QueryBuilderHelper } from 'src/common/helper/query-builder.helper';
+import { QueryHelper } from 'src/common/helper/query.helper';
+import { validate } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
+import archiver from 'archiver';
+import { ApartmentService } from '../apartment/apartment.service';
 interface FilterPayload {
     field: string;
     operator: string;
@@ -26,44 +30,43 @@ export class ResidentsService {
     constructor
         (
             @InjectRepository(Residents)
-            private repo: Repository<Residents>
+            private repo: Repository<Residents>,
+
+            private apartmentService: ApartmentService,
         ) { }
-    async findAll(filter: FilterResidentDto): Promise<PaginationResult<Residents>> {
-
-        const qb = this.repo
-            .createQueryBuilder('resident')
+    async findAll(filter: FilterResidentDto) {
+        // 1. Dựng QueryBuilder cơ bản (Join bảng)
+        const qb = this.repo.createQueryBuilder('resident')
             .leftJoinAndSelect('resident.apartment', 'apartment')
-            .where('resident.deletedAt IS NULL'); // Đảm bảo không lấy bản ghi đã xóa mềm
+            .where('resident.deletedAt IS NULL'); // Giữ logic chưa xóa mềm
 
+        // 2. Gọi Helper để xử lý phần còn lại
+        return await QueryHelper.apply(qb, filter, {
+            alias: 'resident',
 
-        QueryBuilderHelper.applySearch(qb, filter.search?.trim(), [
-            { entityAlias: 'resident', field: 'fullName', collate: true },
-            { entityAlias: 'resident', field: 'email', collate: true },
-            { entityAlias: 'resident', field: 'phone', collate: true },
-            { entityAlias: 'apartment', field: 'roomNumber', collate: true },
-        ]);
+            // Các trường tìm kiếm chung (Search Box)
+            searchFields: [
+                'resident.fullName',
+                'resident.email',
+                'resident.phone',
+                'apartment.roomNumber'
+            ],
 
-        QueryBuilderHelper.applyFilters(qb, filter.filters, {
-            // Mapping từ field FE gửi lên -> field thực trong DB
-            room: 'apartment.roomNumber',
-            joinDate: 'resident.createdAt',
+            // Mapping tên từ Frontend -> DB
+            fieldMap: {
+                'room': 'apartment.roomNumber',
+                'joinDate': 'resident.createdAt', // Map joinDate vào createdAt
+                'birthday': 'resident.birthday',
+                // Map rõ ràng các trường khác để tránh nhầm lẫn
+                'fullName': 'resident.fullName',
+                'email': 'resident.email',
+                'phone': 'resident.phone',
+                'status': 'resident.status'
+            },
+
+            // 🔥 QUAN TRỌNG: Danh sách các trường cần xử lý logic ngày (00:00 -> 23:59)
+            dateFields: ['joinDate', 'birthday', 'createdAt']
         });
-
-        qb.orderBy('resident.id', 'DESC');
-
-
-        const { items, totalItem, page, pageSize } = await QueryBuilderHelper.applyPagination(
-            qb,
-            filter.page ?? 1,
-            filter.pageSize ?? 10,
-        );
-
-        return {
-            totalItem,
-            page,
-            pageSize,
-            items
-        };
     }
     async findById(id: number) {
         const resident = await this.repo.findOne({
@@ -297,10 +300,10 @@ export class ResidentsService {
         const results: any[] = [];
         const errors: { index: number; errorCode: string; details?: any }[] = [];
 
-        // Kiểm tra trùng toàn bộ trước (tối ưu)
-        const phones = dtos.map(d => d.phone);
-        const citizenCards = dtos.map(d => d.citizenCard);
-        const emails = dtos.map(d => d.email).filter(Boolean);
+        // 1. Lấy dữ liệu để check trùng (Pre-fetch)
+        const phones = dtos.map(d => d.phone ? d.phone.toString().trim() : '').filter(Boolean);
+        const citizenCards = dtos.map(d => d.citizenCard ? d.citizenCard.toString().trim() : '').filter(Boolean);
+        const emails = dtos.map(d => d.email ? d.email.toString().trim() : '').filter(Boolean);
 
         const existingPhones = await this.repo.find({ where: { phone: In(phones) } });
         const existingCccd = await this.repo.find({ where: { citizenCard: In(citizenCards) } });
@@ -312,38 +315,112 @@ export class ResidentsService {
 
         for (let i = 0; i < dtos.length; i++) {
             const dto = dtos[i];
+            const rowIndex = i + 2;
 
-            // Kiểm tra trùng
-            if (phoneSet.has(dto.phone)) {
-                errors.push({
-                    index: i + 2,
-                    errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_PHONE,
-                    details: { phone: dto.phone },
-                });
-                continue;
+            // --- A. CHUẨN HÓA DỮ LIỆU (CLEAN DATA) ---
+            const cleanPhone = dto.phone ? dto.phone.toString().trim() : '';
+            const cleanEmail = dto.email ? dto.email.toString().trim() : '';
+            const cleanCccd = dto.citizenCard ? dto.citizenCard.toString().trim() : '';
+            
+            // Xử lý Ngày sinh: Hỗ trợ cả YYYY-MM-DD và DD/MM/YYYY
+            let cleanBirthday = '';
+            const rawBirthday = dto.birthday ? dto.birthday.toString().trim() : '';
+            
+            if (rawBirthday) {
+                // Nếu là dạng ISO (1990-01-01)
+                if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(rawBirthday)) {
+                    cleanBirthday = rawBirthday;
+                } 
+                // Nếu là dạng VN (01/01/1990)
+                else if (rawBirthday.includes('/')) {
+                    const parts = rawBirthday.split('/');
+                    if (parts.length === 3) {
+                        // Chuyển thành YYYY-MM-DD (đảm bảo thêm số 0 nếu thiếu)
+                        const day = parts[0].padStart(2, '0');
+                        const month = parts[1].padStart(2, '0');
+                        const year = parts[2];
+                        cleanBirthday = `${year}-${month}-${day}`;
+                    }
+                }
             }
-            if (cccdSet.has(dto.citizenCard)) {
-                errors.push({
-                    index: i + 2,
-                    errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_CCCD,
-                    details: { citizenCard: dto.citizenCard },
-                });
-                continue;
+
+            // Xử lý Giới tính
+            let cleanGender = GenderEnum.Other;
+            const genderStr = dto.gender ? dto.gender.toString().toLowerCase().trim() : '';
+            if (['nam', 'male', 'trai', 'Nam'].includes(genderStr)) cleanGender = GenderEnum.Male;
+            if (['nữ', 'nu', 'female', 'gái', 'Nữ'].includes(genderStr)) cleanGender = GenderEnum.Female;
+
+
+            // --- B. VALIDATE THỦ CÔNG (LOGIC CỨNG) ---
+            
+            // 1. Validate Ngày sinh
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+            if (!cleanBirthday || !dateRegex.test(cleanBirthday) || isNaN(new Date(cleanBirthday).getTime())) {
+                 errors.push({ index: rowIndex, errorCode: 'FORMAT_ERROR', details: { field: 'birthday', message: `Ngày sinh không hợp lệ: "${rawBirthday}" (Yêu cầu: YYYY-MM-DD hoặc DD/MM/YYYY)` } });
+                 continue;
             }
-            if (dto.email && emailSet.has(dto.email)) {
-                errors.push({
-                    index: i + 2,
-                    errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_EMAIL,
-                    details: { email: dto.email },
-                });
+
+            // 2. Validate SĐT (VN)
+            if (!/^(0|\+84)\d{9,10}$/.test(cleanPhone)) {
+                errors.push({ index: rowIndex, errorCode: 'FORMAT_ERROR', details: { field: 'phone', message: 'SĐT không đúng định dạng (VN)' } });
                 continue;
             }
 
+            // 3. Validate CCCD (12 số)
+            if (!/^\d{12}$/.test(cleanCccd)) {
+                errors.push({ index: rowIndex, errorCode: 'FORMAT_ERROR', details: { field: 'citizenCard', message: 'CCCD phải có đúng 12 chữ số' } });
+                continue;
+            }
+
+            // --- C. VALIDATE DTO (Dùng class-validator cho các trường còn lại như Email) ---
+            const residentValidateObj = plainToInstance(CreateResidentDto, {
+                ...dto,
+                fullName: dto.fullName,
+                phone: cleanPhone,
+                citizenCard: cleanCccd,
+                gender: cleanGender,
+                // Trick: Email rỗng -> undefined để bỏ qua check
+                email: cleanEmail !== '' ? cleanEmail : undefined,
+                apartmentId: dto.apartmentId ? Number(dto.apartmentId) : undefined,
+                // 🔥 Trick: Truyền undefined vào birthday để DTO KHÔNG CHECK LẠI (vì ta đã check tay rồi)
+                birthday: undefined 
+            });
+
+            // Chỉ lấy lỗi không phải birthday
+            const validationErrors = await validate(residentValidateObj);
+            const realErrors = validationErrors.filter(err => err.property !== 'birthday');
+
+            if (realErrors.length > 0) {
+                const firstError = realErrors[0];
+                const message = firstError.constraints ? Object.values(firstError.constraints)[0] : 'Lỗi định dạng';
+                errors.push({ index: rowIndex, errorCode: 'FORMAT_ERROR', details: { field: firstError.property, message: message } });
+                continue; 
+            }
+
+            // --- D. CHECK TRÙNG ---
+            if (phoneSet.has(cleanPhone)) {
+                errors.push({ index: rowIndex, errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_PHONE, details: { phone: cleanPhone } });
+                continue;
+            }
+            if (cccdSet.has(cleanCccd)) {
+                errors.push({ index: rowIndex, errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_CCCD, details: { citizenCard: cleanCccd } });
+                continue;
+            }
+            if (cleanEmail && emailSet.has(cleanEmail)) {
+                errors.push({ index: rowIndex, errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_EMAIL, details: { email: cleanEmail } });
+                continue;
+            }
+
+            // --- E. LƯU VÀO DB ---
             try {
                 const resident = this.repo.create({
-                    ...dto,
-                    birthday: new Date(dto.birthday),
-                    apartment: dto.apartmentId ? { id: dto.apartmentId } : undefined,
+                    fullName: dto.fullName,
+                    phone: cleanPhone,
+                    citizenCard: cleanCccd,
+                    email: cleanEmail || null,
+                    gender: cleanGender,
+                    birthday: new Date(cleanBirthday), // Lúc này mới tạo Date Object an toàn
+                    apartment: dto.apartmentId ? { id: Number(dto.apartmentId) } : undefined,
                     qrCode: crypto.randomBytes(32).toString('hex'),
                     avatar: null,
                     status: 1,
@@ -352,17 +429,9 @@ export class ResidentsService {
                 });
 
                 const saved = await this.repo.save(resident);
-                results.push({
-                    id: saved.id,
-                    fullName: saved.fullName,
-                    phone: saved.phone,
-                });
+                results.push({ id: saved.id, fullName: saved.fullName, phone: saved.phone });
             } catch (err) {
-                errors.push({
-                    index: i + 2,
-                    errorCode: ERROR_CODE.RESIDENT_IMPORT_SAVE_ERROR,
-                    details: { message: err instanceof Error ? err.message : 'Unknown error' },
-                });
+                 errors.push({ index: rowIndex, errorCode: ERROR_CODE.RESIDENT_IMPORT_SAVE_ERROR, details: { message: err instanceof Error ? err.message : 'Unknown error' } });
             }
         }
 
@@ -374,6 +443,33 @@ export class ResidentsService {
         };
     }
 
+    async generateTemplateZip() {
+        // 1. Khởi tạo archiver
+        const archive = archiver('zip', { zlib: { level: 9 } });
 
+        // 2. Tạo nội dung file mẫu nhập liệu (CSV 1)
+        const csvTemplate = `fullName,phone,email,citizenCard,gender,birthday,apartmentId
+                            Nguyễn Văn A,0901234567,a@gmail.com,012345678901,Nam,1990-01-01,5
+                            Trần Thị B,0912345678,b@example.com,012345678902,Nữ,1995-05-20,8
+                            Lê Văn C,0923456789,,012345678903,Khác,1988-11-10,
+                            Phạm Thị D,0934567890,pham.d@example.com,012345678904,Nữ,2000-12-25,12
+                            Hoàng Văn E,0945678901,hoang.e@khuc.com,012345678905,Nam,1975-06-15,`;
+
+        archive.append('\uFEFF' + csvTemplate, { name: '1-mau-import-cu-dan.csv' });
+
+        // 3. Lấy dữ liệu 500 phòng từ ApartmentService và tạo CSV 2
+        const apartments = await this.apartmentService.findAll();
+        let apartmentListContent = `apartmentId (Mã nhập liệu),Tòa/Block,Phòng,Tầng\n`;
+
+        apartments.forEach(item => {
+            // Thay đổi property .id, .name cho đúng với thực tế DB của bạn
+            apartmentListContent += `${item.id},${item.building},${item.roomNumber || ''},${item.floorNumber}\n`;
+        });
+
+        archive.append('\uFEFF' + apartmentListContent, { name: '2-danh-sach-phong-tra-cuu.csv' });
+
+        // Trả về đối tượng archive để Controller pipe vào Response
+        return archive;
+    }
 }
 

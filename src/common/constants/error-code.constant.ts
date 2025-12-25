@@ -14,14 +14,13 @@ export const ERROR_CODE = {
     //dashboard moudle
     //history modole
     HISTORY_SUCCESS: 'success',
-    HISTORY_INVALID_PAGE: 'Invalid page number',//Số trang không hợp lệ
-    HISTORY_SYSTEM_ERROR: 'Internal server error, please try again later',//Lỗi hệ thống,xin thử lại
-    HISTORY_NOT_FOUND: 'Service usage history not found',//Không tìm thấy lịch sử dịch vụ
-    HISTORY_INVALID_DATE: 'Invalid usage date',//Ngày sử dụng không hợp lệ
-    HISTORY_DUPLICATE_ENTRY: 'Service usage entry already exists',//Lịch sử đã tồn tại
-  
-  
+    HISTORY_INVALID_PAGE: 'HISTORY_INVALID_PAGE',//Số trang không hợp lệ
+    HISTORY_SYSTEM_ERROR: 'HISTORY_SYSTEM_ERROR',//Lỗi hệ thống,xin thử lại
+    HISTORY_NOT_FOUND: 'HISTORY_NOT_FOUND',//Không tìm thấy lịch sử dịch vụ
+    HISTORY_INVALID_DATE: 'HISTORY_INVALID_DATE',//Ngày sử dụng không hợp lệ
+    HISTORY_DUPLICATE_ENTRY: 'HISTORY_DUPLICATE_ENTRY',//Lịch sử đã tồn tại
     SERVICE_USAGE_HISTORY_NOT_FOUND: 'SERVICE_USAGE_HISTORY_NOT_FOUND', // Không tìm thấy lịch sử sử dụng dịch vụ
+
 
     // ==================== RESIDENT MODULE ====================
     RESIDENT_NOT_FOUND: 'RESIDENT_NOT_FOUND',    // Không tìm thấy cư dân theo ID  
@@ -53,10 +52,16 @@ export const ERROR_CODE = {
     CCCD_EXISTS: 'CCCD_EXISTS',    // CCCD đã tồn tại trong hệ thống
     PHONE_IN_USE_BY_OTHER: 'PHONE_IN_USE_BY_OTHER',    // Số điện thoại đang được sử dụng bởi người khác
     EMAIL_IN_USE_BY_OTHER: 'EMAIL_IN_USE_BY_OTHER',    // Email đang được sử dụng bởi người khác
+  
     // ==================== SYSTEM CONFIG ====================
     SYSTEM_CONFIG_NOT_FOUND: 'This configuration was not found.',
     SYSTEM_CONFIG_MAINTENANCE: 'The system is currently undergoing maintenance.',
     SYSTEM_CONFIG_INVALID_KEY: 'INVALID_CONFIG_KEY'
+  
+    // ==================== APARTMENT MODULE ====================
+    APARTMENT_NOT_FOUND: 'APARTMENT_NOT_FOUND', // Không tìm thấy phòng theo ID
+    
+
 } as const;
 
 

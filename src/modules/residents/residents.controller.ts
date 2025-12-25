@@ -73,18 +73,22 @@ export class ResidentsController {
     }
 
     @Get('template-csv')
-    async getCsvTemplate(@Res({ passthrough: true }) res: Response) {
-        const csvContent = `fullName,phone,email,citizenCard,gender,birthday,apartmentId
-                        Nguyễn Văn A,0901234567,a@gmail.com,012345678901,Nam,1990-01-01,5
-                        Trần Thị B,0912345678,b@example.com,012345678902,Nữ,1995-05-20,8
-                        Lê Văn C,0923456789,,012345678903,Khác,1988-11-10,
-                        Phạm Thị D,0934567890,pham.d@example.com,012345678904,Nữ,2000-12-25,12
-                        Hoàng Văn E,0945678901,hoang.e@khuc.com,012345678905,Nam,1975-06-15,`;
+    async getCsvTemplate(@Res() res: Response) {
+        // 1. Thiết lập Header để trình duyệt hiểu là file ZIP tải về
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', 'attachment; filename="huong-dan-import.zip"');
 
-        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Disposition', 'attachment; filename="mau-import-cu-dan.csv"');
-        res.send('\uFEFF' + csvContent);
+        // 2. Gọi service để lấy luồng dữ liệu ZIP
+        const archive = await this.service.generateTemplateZip();
+
+        // 3. Pipe (bơm) dữ liệu từ archiver trực tiếp vào Response của Express
+        archive.pipe(res);
+
+        // 4. Kết thúc quá trình đóng gói
+        await archive.finalize();
     }
+
+
 
     @Post('import')
     @Permissions('Residents.Create')
