@@ -67,7 +67,7 @@ export class UpdateResidentDto {
         format: 'binary',
         required: false,
     })
-    @IsString()
+    // @IsString()
     @Optional()
     avatar?: any;
 
