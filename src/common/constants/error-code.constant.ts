@@ -54,17 +54,9 @@ export const ERROR_CODE = {
     PHONE_IN_USE_BY_OTHER: 'PHONE_IN_USE_BY_OTHER',    // Số điện thoại đang được sử dụng bởi người khác
     EMAIL_IN_USE_BY_OTHER: 'EMAIL_IN_USE_BY_OTHER',    // Email đang được sử dụng bởi người khác
     // ==================== SYSTEM CONFIG ====================
-    SYSTEM_CONFIG_OPERATION_HOURS: 'OPERATION_HOURS',
-    SYSTEM_CONFIG_SYSTEM_STATUS: 'SYSTEM_STATUS',
-    SYSTEM_CONFIG_GUEST_CHECKIN: 'GUEST_CHECKIN',
-    SYSTEM_CONFIG_METHOD_CARD: 'METHOD_CARD',
-    SYSTEM_CONFIG_METHOD_MANUAL: 'METHOD_MANUAL',
-    SYSTEM_CONFIG_METHOD_FACEID: 'METHOD_FACEID',
-    SYSTEM_CONFIG_METHOD_QR: 'METHOD_QR',
-    SYSTEM_CONFIG_ACTIVE: 1,
-    SYSTEM_CONFIG_INACTIVE: 0,
     SYSTEM_CONFIG_NOT_FOUND: 'This configuration was not found.',
-    SYSTEM_CONFIG_MAINTENANCE: 'The system is currently undergoing maintenance.'
+    SYSTEM_CONFIG_MAINTENANCE: 'The system is currently undergoing maintenance.',
+    SYSTEM_CONFIG_INVALID_KEY: 'INVALID_CONFIG_KEY'
 } as const;
 
 

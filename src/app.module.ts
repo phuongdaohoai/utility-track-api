@@ -11,6 +11,7 @@ import { ServiceUsageModule } from './modules/history/service-usage.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { SystemConfigModule } from './modules/system_config/system_config.module'
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { UploadModule } from './modules/upload/upload.module';
       },
 
       autoLoadEntities: true,
+      logging: true
     }),
     ResidentsModule,
     StaffModule,
@@ -39,7 +41,8 @@ import { UploadModule } from './modules/upload/upload.module';
     ServiceUsageModule,
     RolesModule,
     DashboardModule,
-    UploadModule
+    UploadModule,
+    SystemConfigModule
   ],
   controllers: [AppController],
   providers: [AppService],

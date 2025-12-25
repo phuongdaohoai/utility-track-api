@@ -10,6 +10,7 @@ import { Residents } from "./residents.entity";
 import { Services } from "./services.entity";
 import { Staffs } from "./staffs.entity";
 import { BaseEntity } from "./base.entity";
+import { CheckInOuts } from "./check-in-outs.entity"
 
 @Index("PK__service___3213E83F3E14CB04", ["id"], { unique: true })
 @Entity("service_usage_histories", { schema: "dbo" })
@@ -43,4 +44,14 @@ export class ServiceUsageHistories extends BaseEntity{
   @ManyToOne(() => Staffs, (staffs) => staffs.serviceUsageHistories)
   @JoinColumn([{ name: "staff_id", referencedColumnName: "id" }])
   staff: Staffs;
+
+  @ManyToOne(() => CheckInOuts, (checkInOut) => checkInOut.serviceUsageHistories, {
+    onDelete: "SET NULL",
+    nullable: true
+  })
+  @JoinColumn([{
+    name: "check_in_out_id",
+    referencedColumnName: "id"
+  }])
+  checkInOut: CheckInOuts;
 }
