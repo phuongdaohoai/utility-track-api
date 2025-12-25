@@ -211,12 +211,15 @@ export class ResidentsService {
             citizenCard: dto.citizenCard ?? resident.citizenCard,
             gender: dto.gender ?? resident.gender,
             birthday: dto.birthday ? new Date(dto.birthday) : resident.birthday,
-            apartmentId: dto.apartmentId ?? resident.apartment?.id,
+            
             status: dto.status ?? resident.status,
             avatar: dto.avatar ?? null,
             updatedBy: userId,
         });
 
+        if (dto.apartmentId) {
+  resident.apartment = { id: dto.apartmentId } as any;
+}
         return await this.repo.save(resident);
     }
 
