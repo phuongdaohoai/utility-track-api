@@ -6,6 +6,8 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { ApiResponse } from 'src/common/response.dto';
 
 @Controller('apartment')
+@ApiBearerAuth('Authorization')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ApartmentController {
     constructor(
         private service: ApartmentService
