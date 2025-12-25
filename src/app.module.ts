@@ -39,9 +39,7 @@ import { ApartmentModule } from './modules/apartment/apartment.module';
         encrypt: false,
         trustServerCertificate: true,
       },
-
-      autoLoadEntities: true,
-      logging: true
+      logging: true,
       extra: {
         timezone: '+07:00',
       },
@@ -56,7 +54,7 @@ import { ApartmentModule } from './modules/apartment/apartment.module';
     RolesModule,
     DashboardModule,
     UploadModule,
-    SystemConfigModule
+    SystemConfigModule,
     ApartmentModule,
   ],
 
