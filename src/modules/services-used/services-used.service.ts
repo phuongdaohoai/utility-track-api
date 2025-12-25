@@ -75,6 +75,7 @@ export class ServicesUsedService {
 
         const service = this.repo.create({
             ...dto,
+            status: dto.status ?? BASE_STATUS.ACTIVE, // nếu FE không gửi, mặc định ACTIVE
             createdBy: userId
         });
         return await this.repo.save(service)
@@ -130,24 +131,18 @@ export class ServicesUsedService {
     }
 
     async remove(id: number, userId: number) {
-        const service = await this.findOne(id);
-        if (!service) throw new NotFoundException({
-            errorCode: ERROR_CODE.SERVICE_NOT_FOUND,
-            message: "Không tìm thấy dịch vụ",
-        });
+    const service = await this.findOne(id);
+    if (!service) throw new NotFoundException({
+        errorCode: ERROR_CODE.SERVICE_NOT_FOUND,
+        message: "Không tìm thấy dịch vụ",
+    });
 
-        if (service.status === BASE_STATUS.INACTIVE || service.deletedAt !== undefined) {
-            throw new ConflictException({
-                errorCode: ERROR_CODE.ALREADY_DELETED,
-                message: "Đã bị xóa trước đó",
-            });
-        }
-        service.deletedAt = new Date();
-        service.updatedBy = userId;
-        service.status = BASE_STATUS.INACTIVE;
+    service.deletedAt = new Date();
+    service.updatedBy = userId;
+    service.status = BASE_STATUS.INACTIVE;
 
-        return await this.repo.softRemove(service);
+    return await this.repo.softRemove(service);
+}
 
-    }
 }
 
