@@ -52,9 +52,16 @@ export const ERROR_CODE = {
     CCCD_EXISTS: 'CCCD_EXISTS',    // CCCD đã tồn tại trong hệ thống
     PHONE_IN_USE_BY_OTHER: 'PHONE_IN_USE_BY_OTHER',    // Số điện thoại đang được sử dụng bởi người khác
     EMAIL_IN_USE_BY_OTHER: 'EMAIL_IN_USE_BY_OTHER',    // Email đang được sử dụng bởi người khác
+  
+    // ==================== SYSTEM CONFIG ====================
+    SYSTEM_CONFIG_NOT_FOUND: 'This configuration was not found.',
+    SYSTEM_CONFIG_MAINTENANCE: 'The system is currently undergoing maintenance.',
+    SYSTEM_CONFIG_INVALID_KEY: 'INVALID_CONFIG_KEY'
+  
     // ==================== APARTMENT MODULE ====================
     APARTMENT_NOT_FOUND: 'APARTMENT_NOT_FOUND', // Không tìm thấy phòng theo ID
     
+
 } as const;
 
 

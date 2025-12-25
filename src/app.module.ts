@@ -12,6 +12,7 @@ import { ServiceUsageModule } from './modules/history/service-usage.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { SystemConfigModule } from './modules/system_config/system_config.module'
 import { ApartmentModule } from './modules/apartment/apartment.module';
 
 @Module({
@@ -39,6 +40,8 @@ import { ApartmentModule } from './modules/apartment/apartment.module';
         trustServerCertificate: true,
       },
 
+      autoLoadEntities: true,
+      logging: true
       extra: {
         timezone: '+07:00',
       },
@@ -53,6 +56,7 @@ import { ApartmentModule } from './modules/apartment/apartment.module';
     RolesModule,
     DashboardModule,
     UploadModule,
+    SystemConfigModule
     ApartmentModule,
   ],
 

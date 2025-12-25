@@ -16,9 +16,47 @@ export default class ServiceUsageService {
     async getHistory(filter: FillerHistoryDto) {
         // 1. Tạo query cơ bản
         const query = this.repo.createQueryBuilder("history")
-            .leftJoinAndSelect("history.resident", "resident")
-            .leftJoinAndSelect("history.service", "service")
-            .leftJoinAndSelect("history.staff", "staff")
+            .leftJoin("history.resident", "resident")
+            .leftJoin("history.service", "service")
+            .leftJoin("history.staff", "staff")
+            .leftJoin("history.checkInOut", "checkInOut")
+            .leftJoin("resident.apartment", "apartment")
+            .select(
+                [
+                    // --- 2. Bảng usageHistory ---
+                    "history.id",
+                    "history.usageTime",
+                    "history.additionalGuests",
+
+                    // --- 2. Bảng Resident ---
+                    "resident.id",
+                    "resident.fullName",
+                    "resident.phone",
+                    "resident.email",
+
+                    // --- 3. Bảng Apartment ---
+                    "apartment.id",
+                    "apartment.building",
+                    "apartment.roomNumber",
+                    "apartment.floorNumber",
+
+                    // --- . Bảng CheckInOut ---
+                    "checkInOut.id",
+                    "checkInOut.method",
+                    "checkInOut.checkInTime",
+                    "checkInOut.checkOutTime",
+
+                    // --- . Bảng Service ---
+                    "service.id",
+                    "service.serviceName",
+                    "service.price",
+                    "service.capacity",
+
+                    // --- . Bảng Staff ---
+                    "staff.id",
+                    "staff.fullName"
+                ]
+            )
             .orderBy("history.usageTime", "DESC");
 
         // 2. Áp dụng tìm kiếm bằng Helper 
@@ -60,7 +98,15 @@ export default class ServiceUsageService {
     async getDetail(id: number) {
         const history = await this.repo.findOne({
             where: { id: id },
-            relations: ["resident", "service", "staff"]
+            relations: {
+                resident: {
+                    apartment: true
+                },
+                service: true,
+                staff: true,
+                checkInOut: true
+            },
+
         });
         if (!history) {
             throw new NotFoundException(ERROR_CODE.HISTORY_NOT_FOUND);
