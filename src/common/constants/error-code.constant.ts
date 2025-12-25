@@ -56,7 +56,7 @@ export const ERROR_CODE = {
     // ==================== SYSTEM CONFIG ====================
     SYSTEM_CONFIG_NOT_FOUND: 'This configuration was not found.',
     SYSTEM_CONFIG_MAINTENANCE: 'The system is currently undergoing maintenance.',
-    SYSTEM_CONFIG_INVALID_KEY: 'INVALID_CONFIG_KEY'
+    SYSTEM_CONFIG_INVALID_KEY: 'INVALID_CONFIG_KEY',
   
     // ==================== APARTMENT MODULE ====================
     APARTMENT_NOT_FOUND: 'APARTMENT_NOT_FOUND', // Không tìm thấy phòng theo ID
