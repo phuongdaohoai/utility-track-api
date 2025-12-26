@@ -221,7 +221,7 @@ export class ResidentsService {
             resident.apartment = { id: dto.apartmentId } as any;
         }
         console.log('DTO avatar =', dto.avatar);
-console.log('BODY =', dto);
+        console.log('BODY =', dto);
 
         return await this.repo.save(resident);
     }
@@ -403,6 +403,17 @@ console.log('BODY =', dto);
                 continue;
             }
 
+            if (!dto.apartmentId || isNaN(Number(dto.apartmentId))) {
+                errors.push({
+                    index: rowIndex,
+                    errorCode: 'FORMAT_ERROR',
+                    details: {
+                        field: 'apartmentId',
+                        message: 'Căn hộ (Apartment) là bắt buộc'
+                    }
+                });
+                continue;
+            }
             // --- D. CHECK TRÙNG ---
             if (phoneSet.has(cleanPhone)) {
                 errors.push({ index: rowIndex, errorCode: ERROR_CODE.RESIDENT_IMPORT_DUPLICATE_PHONE, details: { phone: cleanPhone } });
