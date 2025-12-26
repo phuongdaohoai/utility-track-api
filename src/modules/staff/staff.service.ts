@@ -237,7 +237,7 @@ export class StaffService {
             });
         }
 
-        if (staff.status === BASE_STATUS.INACTIVE || staff.deletedAt !== undefined) {
+        if (staff.deletedAt !== undefined) {
             throw new ConflictException({
                 errorCode: ERROR_CODE.ALREADY_DELETED,
                 message: "Đã bị xóa trước đó",

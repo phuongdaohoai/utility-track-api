@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Residents } from 'src/entities/residents.entity';
 import { Brackets, In, Not, Repository } from 'typeorm';
@@ -234,8 +234,8 @@ export class ResidentsService {
         }
         log(resident.status);
         log(resident.deletedAt);
-        if (resident.status === BASE_STATUS.INACTIVE || resident.deletedAt !== undefined) {
-            throw new BadRequestException({
+        if (resident.deletedAt !== undefined) {
+            throw new ConflictException({
                 errorCode: ERROR_CODE.ALREADY_DELETED,
                 message: "Đã bị xóa trước đó",
             });

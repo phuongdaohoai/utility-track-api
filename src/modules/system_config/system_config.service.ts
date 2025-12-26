@@ -57,7 +57,7 @@ export class SystemService {
             );
         }
 
-        config.configValue = dto.value;
+        config.configValue = dto.status;
         if (dto.description) config.description = dto.description;
 
         return await this.repo.save(config);
