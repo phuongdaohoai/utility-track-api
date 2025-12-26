@@ -237,12 +237,12 @@ export class StaffService {
             });
         }
 
-        // if (staff.status === BASE_STATUS.INACTIVE || staff.deletedAt !== undefined) {
-        //     throw new ConflictException({
-        //         errorCode: ERROR_CODE.ALREADY_DELETED,
-        //         message: "Đã bị xóa trước đó",
-        //     });
-        // }
+        if (staff.deletedAt !== undefined) {
+            throw new ConflictException({
+                errorCode: ERROR_CODE.ALREADY_DELETED,
+                message: "Đã bị xóa trước đó",
+            });
+        }
 
         staff.updatedBy = userId;
         staff.status = BASE_STATUS.INACTIVE;
