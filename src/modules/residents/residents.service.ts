@@ -211,15 +211,18 @@ export class ResidentsService {
             citizenCard: dto.citizenCard ?? resident.citizenCard,
             gender: dto.gender ?? resident.gender,
             birthday: dto.birthday ? new Date(dto.birthday) : resident.birthday,
-            
             status: dto.status ?? resident.status,
-            avatar: dto.avatar ?? null,
             updatedBy: userId,
         });
-
+        if (dto.avatar !== undefined) {
+            resident.avatar = dto.avatar;
+        }
         if (dto.apartmentId) {
-  resident.apartment = { id: dto.apartmentId } as any;
-}
+            resident.apartment = { id: dto.apartmentId } as any;
+        }
+        console.log('DTO avatar =', dto.avatar);
+console.log('BODY =', dto);
+
         return await this.repo.save(resident);
     }
 
@@ -324,16 +327,16 @@ export class ResidentsService {
             const cleanPhone = dto.phone ? dto.phone.toString().trim() : '';
             const cleanEmail = dto.email ? dto.email.toString().trim() : '';
             const cleanCccd = dto.citizenCard ? dto.citizenCard.toString().trim() : '';
-            
+
             // Xử lý Ngày sinh: Hỗ trợ cả YYYY-MM-DD và DD/MM/YYYY
             let cleanBirthday = '';
             const rawBirthday = dto.birthday ? dto.birthday.toString().trim() : '';
-            
+
             if (rawBirthday) {
                 // Nếu là dạng ISO (1990-01-01)
                 if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(rawBirthday)) {
                     cleanBirthday = rawBirthday;
-                } 
+                }
                 // Nếu là dạng VN (01/01/1990)
                 else if (rawBirthday.includes('/')) {
                     const parts = rawBirthday.split('/');
@@ -355,12 +358,12 @@ export class ResidentsService {
 
 
             // --- B. VALIDATE THỦ CÔNG (LOGIC CỨNG) ---
-            
+
             // 1. Validate Ngày sinh
             const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
             if (!cleanBirthday || !dateRegex.test(cleanBirthday) || isNaN(new Date(cleanBirthday).getTime())) {
-                 errors.push({ index: rowIndex, errorCode: 'FORMAT_ERROR', details: { field: 'birthday', message: `Ngày sinh không hợp lệ: "${rawBirthday}" (Yêu cầu: YYYY-MM-DD hoặc DD/MM/YYYY)` } });
-                 continue;
+                errors.push({ index: rowIndex, errorCode: 'FORMAT_ERROR', details: { field: 'birthday', message: `Ngày sinh không hợp lệ: "${rawBirthday}" (Yêu cầu: YYYY-MM-DD hoặc DD/MM/YYYY)` } });
+                continue;
             }
 
             // 2. Validate SĐT (VN)
@@ -386,7 +389,7 @@ export class ResidentsService {
                 email: cleanEmail !== '' ? cleanEmail : undefined,
                 apartmentId: dto.apartmentId ? Number(dto.apartmentId) : undefined,
                 // 🔥 Trick: Truyền undefined vào birthday để DTO KHÔNG CHECK LẠI (vì ta đã check tay rồi)
-                birthday: undefined 
+                birthday: undefined
             });
 
             // Chỉ lấy lỗi không phải birthday
@@ -397,7 +400,7 @@ export class ResidentsService {
                 const firstError = realErrors[0];
                 const message = firstError.constraints ? Object.values(firstError.constraints)[0] : 'Lỗi định dạng';
                 errors.push({ index: rowIndex, errorCode: 'FORMAT_ERROR', details: { field: firstError.property, message: message } });
-                continue; 
+                continue;
             }
 
             // --- D. CHECK TRÙNG ---
@@ -434,7 +437,7 @@ export class ResidentsService {
                 const saved = await this.repo.save(resident);
                 results.push({ id: saved.id, fullName: saved.fullName, phone: saved.phone });
             } catch (err) {
-                 errors.push({ index: rowIndex, errorCode: ERROR_CODE.RESIDENT_IMPORT_SAVE_ERROR, details: { message: err instanceof Error ? err.message : 'Unknown error' } });
+                errors.push({ index: rowIndex, errorCode: ERROR_CODE.RESIDENT_IMPORT_SAVE_ERROR, details: { message: err instanceof Error ? err.message : 'Unknown error' } });
             }
         }
 
