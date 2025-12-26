@@ -68,13 +68,13 @@ export class CreateResidentDto {
     @IsString()
     faceIdData?: string;
 
-  
+
     @ApiProperty({
-        type: 'string',
-        format: 'binary',
+        example: '/avatars/avatar.jpg',
         required: false,
     })
     @IsOptional()
     @IsString()
-    avatar?: any;
+    avatar?: string;
+
 }
