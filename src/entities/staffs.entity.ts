@@ -37,8 +37,7 @@ export class Staffs extends BaseEntity {
   @Column("int", { name: "status", nullable: true, default: () => "(1)" })
   status: number | null;
 
-  @Column({ name: 'qr_token', nullable: true })
-  qrToken: string;
+
 
   @OneToMany(() => CheckInOuts, (checkInOuts) => checkInOuts.staff)
   checkInOuts: CheckInOuts[];
