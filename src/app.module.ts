@@ -9,6 +9,7 @@ import { StaffModule } from './modules/staff/staff.module';
 import { ServicesUsedModule } from './modules/services-used/services-used.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ServiceUsageModule } from './modules/history/service-usage.module';
+import { checkInModule } from './modules/check_in/checkIn.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { UploadModule } from './modules/upload/upload.module';
@@ -51,6 +52,7 @@ import { ApartmentModule } from './modules/apartment/apartment.module';
     ServicesUsedModule,
     AuthModule,
     ServiceUsageModule,
+    checkInModule,
     RolesModule,
     DashboardModule,
     UploadModule,

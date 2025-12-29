@@ -106,7 +106,6 @@ export default class ServiceUsageService {
                 staff: true,
                 checkInOut: true
             },
-
         });
         if (!history) {
             throw new NotFoundException(ERROR_CODE.HISTORY_NOT_FOUND);
