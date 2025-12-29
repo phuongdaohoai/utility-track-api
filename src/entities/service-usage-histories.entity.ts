@@ -11,6 +11,7 @@ import { Services } from "./services.entity";
 import { Staffs } from "./staffs.entity";
 import { BaseEntity } from "./base.entity";
 import { CheckInOuts } from "./check-in-outs.entity"
+import { ServiceUsageMethod } from "src/modules/check_in/dto/service-usage-method.dto";
 
 @Index("PK__service___3213E83F3E14CB04", ["id"], { unique: true })
 @Entity("service_usage_histories", { schema: "dbo" })
@@ -28,6 +29,19 @@ export class ServiceUsageHistories extends BaseEntity{
   @Column("nvarchar", { name: "additional_guests", nullable: true })
   additionalGuests: string | null;
 
+  @Column({ name: 'check_in_time', type: 'datetime' })
+  checkInTime: Date;
+
+  // 🔹 CHECK-OUT
+  @Column({ name: 'check_out_time', type: 'datetime', nullable: true })
+  checkOutTime: Date | null;
+
+  // 🔹 METHOD
+  @Column({
+    type: 'varchar',
+    length: 20,
+  })
+  method: ServiceUsageMethod;
 
   @ManyToOne(() => Residents, (residents) => residents.serviceUsageHistories, {
     onDelete: "SET NULL",

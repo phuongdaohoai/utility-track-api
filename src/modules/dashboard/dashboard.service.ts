@@ -5,17 +5,20 @@ import { CheckInOuts } from 'src/entities/check-in-outs.entity';
 import { ServiceUsageHistories } from 'src/entities/service-usage-histories.entity';
 import { Services } from 'src/entities/services.entity';
 import { Repository } from 'typeorm';
+import { DashboardGroupBy } from './enum/dashboard-group-by.enum';
 
 @Injectable()
 export class DashboardService {
     constructor(
-        @InjectRepository(CheckInOuts)
-        private checkInOutRepo: Repository<CheckInOuts>,
         @InjectRepository(ServiceUsageHistories)
         private serviceUsageRepo: Repository<ServiceUsageHistories>,
     ) { }
 
-    async getDashboardData(groupBy: 'year' | 'month' | 'day') {
+
+
+    async getDashboardData(groupBy: DashboardGroupBy = DashboardGroupBy.MONTH,
+        fromDate?: Date,
+        toDate?: Date,) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -28,10 +31,10 @@ export class DashboardService {
             currentlyInStats,
             usageChartData
         ] = await Promise.all([
-            this.getCheckInOutStats(today, tomorrow),
+            this.getCheckInOutStats(),
             this.getRevenueStats(today, tomorrow),
             this.getResidentsCurrentlyCheckedIn(),
-            this.getServiceUsageChartData(groupBy)
+            this.getServiceUsageChartData(groupBy,fromDate,toDate),
 
         ]);
         return {
@@ -45,22 +48,34 @@ export class DashboardService {
         }
 
     }
-    private async getCheckInOutStats(today: Date, tomorrow: Date) {
-        const todayStr = today.toISOString().split('T')[0];
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
-
-        const result = await this.checkInOutRepo.createQueryBuilder('cio')
-            .select(`COALESCE(SUM(CASE WHEN cio.check_in_time >= :today AND cio.check_in_time < :tomorrow THEN 1 ELSE 0 END), 0)`, 'TotalCheckInsToday')
-            .addSelect(`COALESCE(SUM(CASE WHEN cio.check_out_time >= :today AND cio.check_out_time < :tomorrow THEN 1 ELSE 0 END), 0)`, 'TotalCheckOutsToday')
-            .where(`(cio.check_in_time >= :today AND cio.check_in_time < :tomorrow) OR (cio.check_out_time >= :today AND cio.check_out_time < :tomorrow)`)
-            .setParameters({ today: todayStr, tomorrow: tomorrowStr })
+    private async getCheckInOutStats() {
+        const result = await this.serviceUsageRepo
+            .createQueryBuilder('cio')
+            .select(`
+      COUNT(
+        CASE 
+          WHEN CAST(cio.check_in_time AS DATE) = CAST(GETDATE() AS DATE)
+          THEN 1 
+        END
+      )
+    `, 'TotalCheckInsToday')
+            .addSelect(`
+      COUNT(
+        CASE 
+          WHEN CAST(cio.check_out_time AS DATE) = CAST(GETDATE() AS DATE)
+          THEN 1 
+        END
+      )
+    `, 'TotalCheckOutsToday')
             .getRawOne();
 
         return {
-            totalCheckInsToday: parseInt(result.TotalCheckInsToday) || 0,
-            totalCheckOutsToday: parseInt(result.TotalCheckOutsToday) || 0
-        }
+            totalCheckInsToday: Number(result.TotalCheckInsToday) || 0,
+            totalCheckOutsToday: Number(result.TotalCheckOutsToday) || 0,
+        };
     }
+
+
 
     private async getRevenueStats(today: Date, tomorrow: Date) {
         const todayStr = today.toISOString();
@@ -69,7 +84,7 @@ export class DashboardService {
         const result = await this.serviceUsageRepo.createQueryBuilder('suh')
             .leftJoin('suh.service', 'service')
             .select('COALESCE(SUM(service.price), 0)', 'TotalRevenueToday')
-            .where('suh.usage_time >= :today AND suh.usage_time < :tomorrow')
+            .where('suh.check_in_time >= :today AND suh.check_in_time < :tomorrow')
             .setParameters({ today: todayStr, tomorrow: tomorrowStr })
             .getRawOne();
 
@@ -77,40 +92,79 @@ export class DashboardService {
             totalRevenueToday: parseFloat(result.TotalRevenueToday) || 0,
         };
     }
-
     private async getResidentsCurrentlyCheckedIn() {
-        const result = await this.checkInOutRepo.createQueryBuilder('cio')
+        const result = await this.serviceUsageRepo
+            .createQueryBuilder('cio')
             .select('COUNT(DISTINCT cio.resident_id)', 'residentsCurrentlyInArea')
             .where('cio.check_out_time IS NULL')
             .andWhere('cio.resident_id IS NOT NULL')
+            .andWhere('CAST(cio.check_in_time AS DATE) = CAST(GETDATE() AS DATE)')
             .getRawOne();
 
         return {
-            residentsCurrentlyInArea: parseInt(result.residentsCurrentlyInArea) || 0,
+            residentsCurrentlyInArea: Number(result.residentsCurrentlyInArea) || 0,
         };
     }
 
-    private async getServiceUsageChartData(groupBy: 'year' | 'month' | 'day') {
-        const datePart = {
-            year: 'YEAR(suh.usage_time)',
-            month: 'FORMAT(suh.usage_time, \'yyyy-MM\')',
-            day: 'CAST(suh.usage_time AS DATE)',
+
+    private async getServiceUsageChartData(
+        groupBy: DashboardGroupBy = DashboardGroupBy.MONTH,
+        fromDate?: Date,
+        toDate?: Date,) {
+        const datePartMap = {
+            day: 'CAST(suh.check_in_time AS DATE)',
+
+            month: "FORMAT(suh.check_in_time, 'yyyy-MM')",
+
+            year: 'YEAR(suh.check_in_time)',
+
+            quarter: `
+                    CONCAT(
+                    YEAR(suh.check_in_time),
+                    '-Q',
+                    DATEPART(QUARTER, suh.check_in_time)
+                    )
+                `,
+
+            halfYear: `
+                    CONCAT(
+                    YEAR(suh.check_in_time),
+                    '-H',
+                    CASE 
+                        WHEN MONTH(suh.check_in_time) <= 6 THEN 1
+                        ELSE 2
+                    END
+                    )
+                `,
         };
 
+
+
         // Chọn hàm grouping phù hợp với tham số groupBy
-        const groupByClause = datePart[groupBy] || datePart.month;
+        const groupByClause = datePartMap[groupBy] || datePartMap.month;
         log(groupByClause);
 
-        // Sử dụng Query Builder (và SQL Expression cho GROUP BY)
-        const query = this.serviceUsageRepo.createQueryBuilder('suh')
+        const query = this.serviceUsageRepo
+            .createQueryBuilder('suh')
             .leftJoin('suh.service', 'service')
-            .select(groupByClause, 'Period')
-            .addSelect('service.service_name', 'ServiceName') 
-            .addSelect('COUNT(suh.id)', 'UsageCount') 
-            .groupBy(groupByClause)
+            .select(datePartMap[groupBy], 'Period')
+            .addSelect('service.service_name', 'ServiceName')
+            .addSelect('COUNT(suh.id)', 'UsageCount');
+
+        if (fromDate) {
+            query.andWhere('suh.check_in_time >= :fromDate', { fromDate });
+        }
+
+        if (toDate) {
+            query.andWhere('suh.check_in_time < :toDate', { toDate });
+        }
+
+        query
+            .groupBy(datePartMap[groupBy])
             .addGroupBy('service.service_name')
             .orderBy('Period', 'ASC')
             .addOrderBy('service.service_name', 'ASC');
+
 
         // Đối với SQL Server, cần dùng getRawMany()
         const rawData = await query.getRawMany();

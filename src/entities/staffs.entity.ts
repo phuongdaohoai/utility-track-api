@@ -15,7 +15,7 @@ import { BaseEntity } from "./base.entity";
 @Index("PK__staffs__3213E83F28AE9AC2", ["id"], { unique: true })
 @Index("UQ__staffs__AB6E61644A687662", ["email"], { unique: true })
 @Entity("staffs", { schema: "dbo" })
-export class Staffs extends BaseEntity{
+export class Staffs extends BaseEntity {
   @PrimaryGeneratedColumn({ type: "int", name: "id" })
   id: number;
 
@@ -37,6 +37,8 @@ export class Staffs extends BaseEntity{
   @Column("int", { name: "status", nullable: true, default: () => "(1)" })
   status: number | null;
 
+  @Column({ name: 'qr_token', nullable: true })
+  qrToken: string;
 
   @OneToMany(() => CheckInOuts, (checkInOuts) => checkInOuts.staff)
   checkInOuts: CheckInOuts[];

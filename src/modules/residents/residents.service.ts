@@ -18,6 +18,7 @@ import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import archiver from 'archiver';
 import { ApartmentService } from '../apartment/apartment.service';
+import { RegisterFaceDto } from './dto/resgister-face.dto';
 interface FilterPayload {
     field: string;
     operator: string;
@@ -275,26 +276,13 @@ export class ResidentsService {
     }
 
 
-    // comming soon :vvvvv
-    async registerFaceId(id: number, faceIdData: Buffer): Promise<Residents> {
-        const result = await this.repo.update(id, { faceIdData });
+    async registerFaceId(dto: RegisterFaceDto) {
+        const resident = await this.repo.findOne({ where: { id: dto.residentId } });
+        if (!resident) throw new NotFoundException(ERROR_CODE.RESIDENT_NOT_FOUND);
 
-        if (result.affected === 0) {
-            throw new NotFoundException({
-                errorCode: ERROR_CODE.RESIDENT_NOT_FOUND,
-                message: "Không tìm thấy cư dân",
-            });
-        }
+        resident.faceIdData = Buffer.from(JSON.stringify(dto.faceDescriptor));
 
-        const resident = await this.repo.findOneBy({ id });
-
-        if (!resident) {
-            throw new NotFoundException({
-                errorCode: ERROR_CODE.RESIDENT_NOT_FOUND,
-                message: "Không tìm thấy cư dân",
-            });
-        }
-        return resident;
+        return await this.repo.save(resident);
     }
 
     async unregisterFaceId(id: number): Promise<void> {

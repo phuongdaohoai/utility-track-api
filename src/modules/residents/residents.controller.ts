@@ -12,6 +12,7 @@ import { ApiResponse } from 'src/common/response.dto';
 import { UpdateResidentDto } from './dto/update-resident.dto';
 import type { Response, Express } from 'express';
 import { ImportResidentsDto } from './dto/import-csv.dto';
+import { RegisterFaceDto } from './dto/resgister-face.dto';
 
 @Controller('residents')
 @ApiBearerAuth('Authorization')
@@ -88,8 +89,6 @@ export class ResidentsController {
         await archive.finalize();
     }
 
-
-
     @Post('import')
     @Permissions('Residents.Create')
     async importResidents(
@@ -98,6 +97,15 @@ export class ResidentsController {
     ) {
         const result = await this.service.importResidents(body.residents, req.user.staffId);
         return ApiResponse.ok(result, 'Import cư dân thành công');
+    }
+
+    @Post('register-face-id')
+    @Permissions('Residents.Update')
+    async registerFaceId(
+        @Body() dto: RegisterFaceDto,
+    ) {
+        const result = await this.service.registerFaceId(dto);
+        return ApiResponse.ok(result, "Đăng ký Face ID thành công");
     }
 }
 
