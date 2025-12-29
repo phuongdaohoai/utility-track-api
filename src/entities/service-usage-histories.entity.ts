@@ -35,16 +35,26 @@ export class ServiceUsageHistories extends BaseEntity {
   @Column({ name: 'check_in_time', type: 'datetime' })
   checkInTime: Date;
 
-  // 🔹 CHECK-OUT
   @Column({ name: 'check_out_time', type: 'datetime', nullable: true })
   checkOutTime: Date | null;
 
-  // 🔹 METHOD
   @Column({
     type: 'varchar',
     length: 20,
   })
   method: ServiceUsageMethod;
+
+ 
+  @Column({ name: "resident_id", nullable: true })
+  residentId: number | null;
+
+ 
+  @Column({ name: "service_id", nullable: true })
+  serviceId: number | null;
+
+  
+  @Column({ name: "staff_id", nullable: true })
+  staffId: number | null;
 
   @ManyToOne(() => Residents, (residents) => residents.serviceUsageHistories, {
     onDelete: "SET NULL",
