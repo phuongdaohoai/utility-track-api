@@ -1,109 +1,109 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { CreateCheckInAuTo } from "./dto/check-in-auto.dto";
 import { CreateCheckInDto } from "./dto/create-checkin.dto";
 import { IsNull, Repository } from "typeorm";
-import { CheckInOuts } from "src/entities/check-in-outs.entity";
 import { Residents } from "src/entities/residents.entity";
 import { ERROR_CODE } from "src/common/constants/error-code.constant";
 import { ResidentCheckInDto } from "./dto/resident-check-in.dto";
 import { ServiceUsageHistories } from "src/entities/service-usage-histories.entity";
 import { ServiceUsageMethod } from "./dto/service-usage-method.dto";
+import { Services } from 'src/entities/services.entity'
 @Injectable()
 export class CheckInService {
     constructor(
-        @InjectRepository(CheckInOuts)
-        private repo: Repository<CheckInOuts>,
 
         @InjectRepository(ServiceUsageHistories)
         private serviceUsageRepo: Repository<ServiceUsageHistories>,
 
         @InjectRepository(Residents)
         private residentRepo: Repository<Residents>,
+
+        @InjectRepository(Services)
+        private serviceRepo: Repository<Services>,
     ) { }
 
-    async createCheckIn(data: CreateCheckInDto, staffId: number | null) {
-        const { residentId, guestName, guestPhone, checkInMethod } = data;
+    async createCheckIn(data: CreateCheckInDto, staffId: number) {
+        const { guestName, guestPhone, serviceId } = data;
 
-        const checkin = new CheckInOuts();
-
-        // Xử lý Staff
-        if (staffId) {
-            checkin.staff = { id: staffId } as any;
-        } else {
-            throw new NotFoundException(ERROR_CODE.STAFF_NOT_FOUND)
+        // 1. Validate: Bắt buộc phải có SĐT để biết ai là ai
+        if (!guestPhone) {
+            throw new NotFoundException("Vui lòng nhập Số điện thoại để hệ thống tự động Check-in/Check-out!");
         }
 
-        checkin.method = checkInMethod || 'Manual';
-        checkin.checkInTime = new Date();
+        if (!staffId) {
+            throw new NotFoundException(ERROR_CODE.STAFF_NOT_FOUND);
+        }
 
-        let residentData: Residents | null = null;
+        // 2. Lấy tên dịch vụ (để hiển thị cho đẹp)
+        const serviceObj = await this.serviceRepo.findOne({ where: { id: serviceId } });
+        const serviceNameDisplay = serviceObj ? serviceObj.serviceName : `Dịch vụ #${serviceId}`;
 
-        // Xử lý logic phân luồng
-        if (residentId) {
-            // --- CƯ DÂN ---
-            const resident = await this.residentRepo.findOne({
-                where: { id: Number(residentId) },
-                relations: ["apartment"]
-            });
-            if (!resident) {
-                throw new NotFoundException(`Cư dân (ID: ${residentId}) không tồn tại!`);
+        // 3. TÌM KIẾM: Khách này có đang ở trong không
+        const existingSession = await this.serviceUsageRepo.findOne({
+            where: {
+                phone: guestPhone,
+                serviceId: serviceId,
+                checkOutTime: IsNull() 
             }
-            checkin.resident = resident;
-            residentData = resident;
-        } else {
-            // --- KHÁCH VÃNG LAI ---
-            checkin.guestName = guestName || null;
-        }
-
-        // Lưu vào DB
-        const savedCheckIn = await this.repo.save(checkin);
-
-        return {
-            checkinId: savedCheckIn.id,
-            checkinTime: savedCheckIn.checkInTime,
-            method: savedCheckIn.method,
-            representative: residentData ? residentData.fullName : guestName,
-
-            phoneNumber: residentData ? residentData.phone : guestPhone,
-
-            apartment: residentData?.apartment ? {
-                id: residentData.apartment.id,
-                name: residentData.apartment.building,
-                block: residentData.apartment.roomNumber
-            } : null,
-            type: residentData ? 'RESIDENT' : 'GUEST'
-        }
-    }
-
-    async autoCheckIn(data: CreateCheckInAuTo, staffId: number | null) {
-        const { code } = data;
-
-        const resident = await this.residentRepo.findOne({
-            where: [
-                { citizenCard: code },
-                { qrCode: code }
-            ]
         });
 
-        if (!resident) {
-            throw new NotFoundException(`Mã thẻ/QR "${code}" không tồn tại trong hệ thống!`);
+        // ---------------------------------------------------------
+        //  TRƯỜNG HỢP A: ĐÃ CÓ -> THỰC HIỆN CHECK-OUT
+        // ---------------------------------------------------------
+        if (existingSession) {
+            existingSession.checkOutTime = new Date();
+
+            const savedOut = await this.serviceUsageRepo.save(existingSession);
+
+
+            return {
+                checkinId: savedOut.id,
+                status: 'CHECK_OUT', 
+                message: `Đã Check-out cho khách: ${savedOut.additionalGuests}`,
+                checkInTime: savedOut.checkInTime,
+                checkOutTime: savedOut.checkOutTime,
+
+                serviceName: serviceNameDisplay,
+                representative: savedOut.additionalGuests,
+                phoneNumber: savedOut.phone,
+                type: 'GUEST'
+            };
         }
 
-        let method = 'Manual';
-        if (resident.citizenCard === code) method = 'Card';
-        else if (resident.qrCode === code) method = 'QR';
+        // ---------------------------------------------------------
+        // TRƯỜNG HỢP B: CHƯA CÓ -> THỰC HIỆN CHECK-IN (Tạo mới)
+        // ---------------------------------------------------------
+        const newCheckIn = new ServiceUsageHistories();
 
-        const manualDTO: CreateCheckInDto = {
-            residentId: resident.id.toString(),
-            checkInMethod: method,
-            guestName: undefined,
-            guestPhone: undefined,
+        newCheckIn.staffId = staffId;
+        newCheckIn.serviceId = serviceId;
+        newCheckIn.method = ServiceUsageMethod.MANUAL;
+        newCheckIn.checkInTime = new Date();
+
+        // Info khách
+        newCheckIn.residentId = null;
+        newCheckIn.additionalGuests = guestName || 'Khách vãng lai';
+        newCheckIn.phone = guestPhone;
+
+        const savedIn = await this.serviceUsageRepo.save(newCheckIn);
+
+        return {
+            checkinId: savedIn.id,
+            status: 'CHECK_IN',
+            message: 'Check-in thành công!',
+            checkInTime: savedIn.checkInTime,
+            checkOutTime: null,
+
+            serviceName: serviceNameDisplay,
+            representative: guestName,
+            phoneNumber: guestPhone,
+
+            quantity: 1,
+            members: [{ stt: 1, fullName: guestName }],
+            type: 'GUEST',
+            apartment: null
         };
-
-        return await this.createCheckIn(manualDTO, staffId);
     }
-
     async findResident(qrCode?: string, faceDescriptor?: number[]): Promise<Residents> {
         if (qrCode) {
             const resident = await this.residentRepo.findOne({
