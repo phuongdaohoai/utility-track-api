@@ -15,7 +15,7 @@ import { ServiceUsageMethod } from "src/modules/check_in/dto/service-usage-metho
 
 @Index("PK__service___3213E83F3E14CB04", ["id"], { unique: true })
 @Entity("service_usage_histories", { schema: "dbo" })
-export class ServiceUsageHistories extends BaseEntity{
+export class ServiceUsageHistories extends BaseEntity {
   @PrimaryGeneratedColumn({ type: "int", name: "id" })
   id: number;
 
@@ -28,6 +28,9 @@ export class ServiceUsageHistories extends BaseEntity{
 
   @Column("nvarchar", { name: "additional_guests", nullable: true })
   additionalGuests: string | null;
+
+  @Column({ name: 'phone', type: 'nvarchar', length: 20, nullable: true })
+  phone: string | null;
 
   @Column({ name: 'check_in_time', type: 'datetime' })
   checkInTime: Date;

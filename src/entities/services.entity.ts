@@ -35,6 +35,9 @@ export class Services extends BaseEntity{
   @Column("int", { name: "status", nullable: true, default: () => "(1)" })
   status: number | null;
 
+  @Column({ name: 'qr_token', nullable: true })
+  qrToken: string;
+  
   @OneToMany(
     () => ServiceUsageHistories,
     (serviceUsageHistories) => serviceUsageHistories.service
