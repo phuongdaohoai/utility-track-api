@@ -13,8 +13,14 @@ export class DashboardController {
     constructor(private service: DashboardService) { }
     @Get('getDashboardData')
     async getDashboardData(@Query() query: DashboardQueryDto) {
-        const result = await this.service.getDashboardData(query.groupBy);
-        return ApiResponse.ok(result,"Lấy dữ liệu thành công");
+
+        const result = await this.service.getDashboardData(
+            query.groupBy,
+            query.fromDate ? new Date(query.fromDate) : undefined,
+            query.toDate ? new Date(query.toDate) : undefined,
+        );
+
+        return ApiResponse.ok(result, 'Lấy dữ liệu thành công');
     }
 
 }
