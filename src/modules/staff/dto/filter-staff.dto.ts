@@ -18,5 +18,10 @@ export class FilterStaffDto {
     @IsOptional()
     @Type(() => Number)
     @IsNumber()
-    pageSize?: number;          
+    pageSize?: number;      
+
+    @ApiProperty({ required: false, description: 'JSON string filters' })
+    @IsOptional()
+    @IsString()
+    filters?: string;
 }

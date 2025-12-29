@@ -5,7 +5,7 @@ import { CreateCheckInDto } from "./dto/create-checkin.dto";
 import { Repository } from "typeorm";
 import { CheckInOuts } from "src/entities/check-in-outs.entity";
 import { Residents } from "src/entities/residents.entity";
-
+import { ERROR_CODE } from "src/common/constants/error-code.constant";
 @Injectable()
 export class CheckInService {
     constructor(
@@ -24,7 +24,7 @@ export class CheckInService {
         if (staffId) {
             checkin.staff = { id: staffId } as any;
         } else {
-            checkin.staff = null;
+            throw new NotFoundException(ERROR_CODE.STAFF_NOT_FOUND)
         }
 
         checkin.method = checkInMethod || 'Manual';
@@ -58,7 +58,6 @@ export class CheckInService {
             method: savedCheckIn.method,
             representative: residentData ? residentData.fullName : guestName,
 
-            // Trả về để xem cho vui thôi chứ trong DB không lưu SĐT khách nhé
             phoneNumber: residentData ? residentData.phone : guestPhone,
 
             apartment: residentData?.apartment ? {
@@ -97,4 +96,4 @@ export class CheckInService {
 
         return await this.createCheckIn(manualDTO, staffId);
     }
-}
+}   

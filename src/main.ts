@@ -11,9 +11,13 @@ async function bootstrap() {
 
   app.useGlobalInterceptors(new DateTimezoneInterceptor());
 
-  app.useStaticAssets(join(__dirname, '..', 'public/avatars'), {
-    prefix: '/avatars/', // URL: http://localhost:3000/avatars/xxx.jpg
+  // app.useStaticAssets(join(__dirname, '..', 'public/avatars'), {
+  //   prefix: '/avatars/', // URL: http://localhost:3000/avatars/xxx.jpg
+  // });
+  app.useStaticAssets(join(process.cwd(), 'public'), {
+    prefix: '/',
   });
+
 
 
   app.useGlobalPipes(new ValidationPipe({
@@ -22,7 +26,7 @@ async function bootstrap() {
     transform: true,
     transformOptions: { enableImplicitConversion: true }
   }));
-  
+
   const config = new DocumentBuilder()
     .setTitle('NestJS SQL Server API')
     .setDescription('API Documentation')
@@ -34,7 +38,7 @@ async function bootstrap() {
         bearerFormat: 'JWT',
         in: 'header',
       },
-      'Authorization', 
+      'Authorization',
     )
     .build();
 

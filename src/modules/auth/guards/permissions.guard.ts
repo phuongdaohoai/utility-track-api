@@ -1,6 +1,7 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
+import { ERROR_CODE } from 'src/common/constants/error-code.constant';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -19,7 +20,10 @@ export class PermissionsGuard implements CanActivate {
         const user = request.user; // payload JWT
 
         if (!user || !user.permissions) {
-            throw new ForbiddenException('Bạn không có quyền truy cập');
+            throw new ForbiddenException({
+                errorCode: ERROR_CODE.AUTH_NO_PERMISSIONS_PROVIDED,
+                message: "Không có quyền truy cập",
+            });
         }
 
         const userPermissions = user.permissions;
@@ -29,7 +33,14 @@ export class PermissionsGuard implements CanActivate {
         );
 
         if (!hasPermission) {
-            throw new ForbiddenException('Không đủ quyền');
+            throw new ForbiddenException({
+                errorCode: ERROR_CODE.AUTH_FORBIDDEN,
+                message: "Không đủ quyền truy cập",
+                details: {
+                    required: requiredPermissions,
+                    has: userPermissions,
+                },
+            });
         }
 
         return true;

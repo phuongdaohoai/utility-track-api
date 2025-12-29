@@ -5,15 +5,16 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  OneToMany
 } from "typeorm";
 import { Residents } from "./residents.entity";
 import { Staffs } from "./staffs.entity";
 import { BaseEntity } from "./base.entity";
-import { Services } from "./services.entity";
+import { ServiceUsageHistories } from "./service-usage-histories.entity"
 
 @Index("PK__check_in__3213E83FA82DED14", ["id"], { unique: true })
 @Entity("check_in_outs", { schema: "dbo" })
-export class CheckInOuts extends BaseEntity{
+export class CheckInOuts extends BaseEntity {
   @PrimaryGeneratedColumn({ type: "int", name: "id" })
   id: number;
 
@@ -42,9 +43,9 @@ export class CheckInOuts extends BaseEntity{
 
   @ManyToOne(() => Staffs, (staffs) => staffs.checkInOuts)
   @JoinColumn([{ name: "staff_id", referencedColumnName: "id" }])
-  staff: Staffs | null;
 
-  // @ManyToOne(() => Services)
-  // @JoinColumn([{ name: "service_id", referencedColumnName: "id" }])
-  // service: Services;
+  staff: Staffs;
+
+  @OneToMany(() => ServiceUsageHistories, (history) => history.checkInOut)
+  serviceUsageHistories: ServiceUsageHistories[];
 }

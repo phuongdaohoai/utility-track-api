@@ -1,27 +1,29 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNotEmpty, isNumber, IsNumber, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min } from "class-validator";
 
-export class CreateServiceDto{
-    @ApiProperty({ example: "Massage Foot", description: "Tên dịch vụ" })
+export class CreateServiceDto {
     @IsNotEmpty()
     @IsString()
     serviceName: string;
 
-    @ApiProperty({ example: 10, description: "Số lượng khách tối đa", minimum: 1, maximum: 300 })
     @IsNumber()
     @Max(300)
     @Min(1)
     capacity: number;
 
-    @ApiProperty({ example: "Dịch vụ massage chân thư giãn", required: false })
     @IsOptional()
     @IsString()
     description?: string;
 
-
-    @ApiProperty({ example: 200000, description: "Giá dịch vụ", minimum: 0, maximum: 10000000 })
     @IsNumber()
     @Min(0)
     @Max(10000000)
     price: number;
+
+    @IsNumber()
+    @Min(0)
+    @Max(1)
+    @IsOptional()
+    @ApiProperty({ example: 1, description: "Trạng thái (1: Hoạt động, 0: Không hoạt động)", required: false })
+    status?: number;
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { StaffService } from './staff.service';
 import { ApiBearerAuth, ApiConsumes, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
@@ -6,11 +6,10 @@ import { PermissionsGuard } from 'src/modules/auth/guards/permissions.guard';
 import { Permissions } from 'src/modules/auth/decorators/permissions.decorator';
 import { FilterStaffDto } from './dto/filter-staff.dto';
 import { ApiResponse } from 'src/common/response.dto';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { multerConfig } from 'src/common/configs/multer.config';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
-
+import { ImportStaffDto } from './dto/import-staff.dto';
+import type { Response } from 'express';
 @Controller('staff')
 @ApiBearerAuth('Authorization')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -27,13 +26,10 @@ export class StaffController {
 
     @Post('create')
     @Permissions('Staff.Create')
-    @ApiConsumes('multipart/form-data')
-    @UseInterceptors(FileInterceptor('avatar', multerConfig))
     async create(
-        @UploadedFile() file: Express.Multer.File,
         @Body() dto: CreateStaffDto,
         @Req() req) {
-        const result= await this.service.create(dto, file, req.user.staffId);
+        const result= await this.service.create(dto, req.user.staffId);
         return ApiResponse.ok(result, "Thêm nhân viên thành công");
     }
 
@@ -48,14 +44,11 @@ export class StaffController {
 
     @Put('update/:staffId')
     @Permissions('Staff.Update')
-    @ApiConsumes('multipart/form-data')
-    @UseInterceptors(FileInterceptor('avatar', multerConfig))
     async update(
         @Param('staffId') staffId: number,
-        @UploadedFile() file: Express.Multer.File,
         @Body() dto: UpdateStaffDto,
         @Req() req) {
-        const result=await this.service.update(+staffId, dto, file, req.user.staffId);
+        const result=await this.service.update(+staffId, dto, req.user.staffId);
         return ApiResponse.ok(result,"Cập nhật nhân viên thành công");
     }
 
@@ -66,5 +59,27 @@ export class StaffController {
         @Req() req) {
         const result=await this.service.remove(+staffId, req.user.staffId);
         return ApiResponse.ok(result,"Xóa nhân viên thành công");
+    }
+
+    @Post('import')
+    @Permissions('Staff.Create')
+    async importStaff(
+        @Body() body: ImportStaffDto,
+        @Req() req: any,
+    ) {
+        const result = await this.service.importStaffs(body.staffs, req.user.staffId);
+        return ApiResponse.ok(result, 'Import nhân sự thành công');
+    }
+
+    @Get('template-csv')
+    async getStaffCsvTemplate(@Res({ passthrough: true }) res: Response) {
+        const csvContent = `fullName,email,phone,roleId,password
+                        Nguyễn Văn Quản Lý,quanly@company.com,0901234567,1,
+                        Trần Bảo Vệ,baove@company.com,0912345678,3,Matkhau123
+                        Lê Kỹ Thuật,kythuat@company.com,0923456789,4,`;
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="mau-import-nhan-su.csv"');
+        res.send('\uFEFF' + csvContent);
     }
 }

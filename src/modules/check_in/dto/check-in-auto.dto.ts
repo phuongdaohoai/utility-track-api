@@ -9,13 +9,4 @@ export class CreateCheckInAuTo {
     @IsNotEmpty({ message: 'Không quét được mã, vui lòng thử lại!' })
     @IsString()
     code: string;
-
-    // @ApiProperty({
-    //     example: 1,
-    //     description: 'ID dịch vụ sử dụng (nếu có)'
-    // })
-    // @IsOptional()
-    // @IsNumber()
-    // serviceId?: number;
-
 }

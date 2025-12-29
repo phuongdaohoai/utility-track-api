@@ -8,9 +8,12 @@ import { Staffs } from 'src/entities/staffs.entity';
 import { ServiceUsageHistories } from 'src/entities/service-usage-histories.entity';
 import { Services } from 'src/entities/services.entity';
 import { Apartments } from 'src/entities/apartments.entity';
+import { ApartmentModule } from '../apartment/apartment.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Residents, CheckInOuts, Staffs, ServiceUsageHistories, Services, Apartments])],
+  imports: [TypeOrmModule.forFeature([Residents, CheckInOuts, Staffs, ServiceUsageHistories, Services, Apartments]),
+    ApartmentModule
+  ],
   controllers: [ResidentsController],
   providers: [ResidentsService]
 })
