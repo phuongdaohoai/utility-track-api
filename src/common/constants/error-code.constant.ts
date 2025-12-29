@@ -60,8 +60,10 @@ export const ERROR_CODE = {
   
     // ==================== APARTMENT MODULE ====================
     APARTMENT_NOT_FOUND: 'APARTMENT_NOT_FOUND', // Không tìm thấy phòng theo ID
-    
 
+    // ==================== CHECKIN-OUT MODULE ====================
+    CHECKIN_INVALID_RESIDENT: 'CHECKIN_INVALID_RESIDENT', // Cư dân không hợp lệ
+    CHECKIN_NO_ACTIVE_CHECKIN: 'CHECKIN_NO_ACTIVE_CHECKIN', // Không có check-in đang hoạt động
 } as const;
 
 

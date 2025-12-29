@@ -3,6 +3,7 @@ import { CheckInService } from './checkIn.service';
 import { CreateCheckInDto } from './dto/create-checkin.dto';
 import { CreateCheckInAuTo } from './dto/check-in-auto.dto';
 import { ApiResponse } from "../../common/response.dto";
+import { ResidentCheckInDto } from './dto/resident-check-in.dto';
 
 
 @Controller('check-in')
@@ -22,5 +23,11 @@ export class CheckInController {
         const staffId = req.user?.id || 1;
         const result = await this.checkInService.autoCheckIn(data, staffId);
         return ApiResponse.ok(result, "Check-in thành công!");
+    }
+
+    @Post('resident-check-in')
+    async residentCheckIn(@Body() dto: ResidentCheckInDto) {
+        const result = await this.checkInService.residentCheckInOrOut(dto);
+        return ApiResponse.ok(result);
     }
 }
