@@ -52,7 +52,6 @@ export class CheckInService {
         // ---------------------------------------------------------
         if (existingSession) {
             existingSession.checkOutTime = new Date();
-            // existingSession.checkOutStaffId = staffId; // Nếu Pro có cột lưu người check-out
 
             const savedOut = await this.serviceUsageRepo.save(existingSession);
 
