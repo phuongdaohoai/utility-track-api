@@ -8,6 +8,7 @@ import { ResidentCheckInDto } from "./dto/resident-check-in.dto";
 import { ServiceUsageHistories } from "src/entities/service-usage-histories.entity";
 import { ServiceUsageMethod } from "./dto/service-usage-method.dto";
 import { Services } from 'src/entities/services.entity'
+import { SystemService } from '../system_config/system_config.service';
 @Injectable()
 export class CheckInService {
     constructor(
@@ -20,14 +21,27 @@ export class CheckInService {
 
         @InjectRepository(Services)
         private serviceRepo: Repository<Services>,
+
+        private readonly systemConfigService: SystemService,
     ) { }
 
+
+
     async createCheckIn(data: CreateCheckInDto, staffId: number) {
+
+        await this.systemConfigService.validateAccess('MANUAL');
+
+        // BƯỚC 2: Check xem có cho phép Check-in khách không? (Logic Key riêng)
+        const allowGuest = await this.systemConfigService.getConfigValue('GUEST_CHECKIN');
+
+        if (allowGuest === '0') {
+            throw new BadRequestException();
+        }
         const { guestName, guestPhone, serviceId } = data;
 
         // 1. Validate: Bắt buộc phải có SĐT để biết ai là ai
         if (!guestPhone) {
-            throw new NotFoundException("Vui lòng nhập Số điện thoại để hệ thống tự động Check-in/Check-out!");
+            throw new NotFoundException();
         }
 
         if (!staffId) {
@@ -132,13 +146,16 @@ export class CheckInService {
         return Math.sqrt(a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0));
     }
     async residentCheckInOrOut(dto: ResidentCheckInDto) {
+        const method = dto.qrCode ? ServiceUsageMethod.QR_CODE : ServiceUsageMethod.FACE_ID;
+        const methodKey = method === ServiceUsageMethod.QR_CODE ? 'QR' : 'FACEID';
+        await this.systemConfigService.validateAccess(methodKey);
+
         if (!dto.qrCode && !dto.faceDescriptor) {
             throw new BadRequestException(ERROR_CODE.CHECKIN_INVALID_RESIDENT, 'Cư dân không hợp lệ! Vui lòng thử lại.');
         }
 
         const resident = await this.findResident(dto.qrCode, dto.faceDescriptor);
 
-        const method = dto.qrCode ? ServiceUsageMethod.QR_CODE : ServiceUsageMethod.FACE_ID;
 
         const activeUsage = await this.serviceUsageRepo.findOne({
             where: {
