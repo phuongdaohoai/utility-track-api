@@ -187,6 +187,8 @@ export class CheckInService {
                 apartment: resident.apartment
                     ? `${resident.apartment.building} - ${resident.apartment.roomNumber}`
                     : null,
+                avatar: resident.avatar,
+                additionalGuests: dto.additionalGuests || [],
                 duration_minutes: durationMinutes,
             };
         }
@@ -198,7 +200,8 @@ export class CheckInService {
             checkInTime: new Date(),
             checkOutTime: null,
             method: method,
-            additionalGuests: null,
+            additionalGuests: dto.additionalGuests ? dto.additionalGuests.join(', ') : null,
+            phone: resident.phone
         });
 
         await this.serviceUsageRepo.save(newUsage);
@@ -211,6 +214,7 @@ export class CheckInService {
                 ? `${resident.apartment.building} - ${resident.apartment.roomNumber}`
                 : null,
             avatar: resident.avatar,
+            additionalGuests: dto.additionalGuests || []
         };
     }
 }   
