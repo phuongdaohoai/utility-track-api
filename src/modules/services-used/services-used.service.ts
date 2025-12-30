@@ -10,6 +10,7 @@ import { ApiResponse } from 'src/common/response.dto';
 import { BASE_STATUS } from 'src/common/constants/base-status.constant';
 import { ERROR_CODE } from 'src/common/constants/error-code.constant';
 import { QueryBuilderHelper } from 'src/common/helper/query-builder.helper';
+import { randomUUID } from "crypto";
 
 @Injectable()
 export class ServicesUsedService {
@@ -47,7 +48,7 @@ export class ServicesUsedService {
     async findById(id: number) {
         const service = await this.findOne(id);
         if (!service) throw new NotFoundException({
-            errorCode:ERROR_CODE.SERVICE_NOT_FOUND,
+            errorCode: ERROR_CODE.SERVICE_NOT_FOUND,
             message: "Không tìm thấy dịch vụ",
         })
         return service;
@@ -62,25 +63,27 @@ export class ServicesUsedService {
     }
 
     async create(dto: CreateServiceDto, userId: number) {
-        const exist = await this.repo.findOne({
-            where: { serviceName: dto.serviceName }
+    const exist = await this.repo.findOne({
+        where: { serviceName: dto.serviceName }
+    });
+
+    if (exist) {
+        throw new BadRequestException({
+            errorCode: ERROR_CODE.SERVICE_NAME_EXISTS,
+            message: "Tên dịch vụ đã tồn tại",
         });
-
-        if (exist) {
-            throw new BadRequestException({
-                errorCode: ERROR_CODE.SERVICE_NAME_EXISTS,
-                message: "Tên dịch vụ đã tồn tại",
-            });
-        }
-
-        const service = this.repo.create({
-            ...dto,
-            status: dto.status ?? BASE_STATUS.ACTIVE, // nếu FE không gửi, mặc định ACTIVE
-            createdBy: userId
-        });
-        return await this.repo.save(service)
-
     }
+
+    const service = this.repo.create({
+        ...dto,
+        qrToken: randomUUID(), // ✅ FIX Ở ĐÂY
+        status: dto.status ?? BASE_STATUS.ACTIVE,
+        createdBy: userId
+    });
+
+    return await this.repo.save(service);
+}
+
 
     async update(id: number, dto: UpdateServiceDto, userId: number) {
         const service = await this.repo.findOne({
@@ -131,18 +134,18 @@ export class ServicesUsedService {
     }
 
     async remove(id: number, userId: number) {
-    const service = await this.findOne(id);
-    if (!service) throw new NotFoundException({
-        errorCode: ERROR_CODE.SERVICE_NOT_FOUND,
-        message: "Không tìm thấy dịch vụ",
-    });
+        const service = await this.findOne(id);
+        if (!service) throw new NotFoundException({
+            errorCode: ERROR_CODE.SERVICE_NOT_FOUND,
+            message: "Không tìm thấy dịch vụ",
+        });
 
-    service.deletedAt = new Date();
-    service.updatedBy = userId;
-    service.status = BASE_STATUS.INACTIVE;
+        service.deletedAt = new Date();
+        service.updatedBy = userId;
+        service.status = BASE_STATUS.INACTIVE;
 
-    return await this.repo.softRemove(service);
-}
+        return await this.repo.softRemove(service);
+    }
 
 }
 
