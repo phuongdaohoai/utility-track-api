@@ -10,6 +10,8 @@ import { ServiceUsageMethod } from "./dto/service-usage-method.dto";
 import { Services } from 'src/entities/services.entity'
 import { SystemService } from '../system_config/system_config.service';
 import { FindResidentDto } from "./dto/find-resident.dto";
+import { QueryHelper } from "src/common/helper/query.helper";
+import { FilterCheckinDto } from "./dto/filter-checkin.dto";
 @Injectable()
 export class CheckInService {
     constructor(
@@ -26,31 +28,48 @@ export class CheckInService {
         private readonly systemConfigService: SystemService,
     ) { }
 
-    async getCurrentCheckIns() {
-        const usages = await this.serviceUsageRepo.find({
-            where: { checkOutTime: IsNull() },
-            relations: ['resident', 'service', 'resident.apartment'],
-            order: { checkInTime: 'DESC' },
+    async getCurrentCheckIns(filter: FilterCheckinDto) {
+
+        const qb = this.serviceUsageRepo.createQueryBuilder('serviceUsageHistories').leftJoinAndSelect('serviceUsageHistories.resident', 'resident')
+            .leftJoinAndSelect('resident.apartment', 'apartment')
+            .leftJoinAndSelect('serviceUsageHistories.service', 'service')
+            .where('serviceUsageHistories.checkOutTime IS NULL');
+
+        const result = await QueryHelper.apply(qb, filter, {
+            alias: 'serviceUsageHistories',
+            searchFields: [
+                'resident.fullName',
+                'apartment.building',
+                'apartment.roomNumber',
+                'serviceUsageHistories.additionalGuests',
+                'service.serviceName',
+                'resident.phone',
+            ],
         });
 
-        return usages.map(u => {
-            const guests = parseGuests(u.additionalGuests);
-            const hasResident = !!u.resident;
+        return {
+            totalItem: result.totalItem,
+            page: result.page,
+            pageSize: result.pageSize,
+            items: result.items.map(u => {
+                const guests = parseGuests(u.additionalGuests);
+                const hasResident = !!u.resident;
 
-            const displayName = hasResident ? u.resident.fullName : guests[0] ?? 'Khách';
-
-            const totalPeople = guests.length + (hasResident ? 1 : 0);
-
-            return {
-                id: u.id,
-                displayName: displayName,
-                room: hasResident && u.resident.apartment ? `${u.resident.apartment.building} - ${u.resident.apartment.roomNumber}` : "-",
-                totalPeople: totalPeople,
-                servicenAME: u.service.serviceName,
-                checkInTime: u.checkInTime,
-                method: u.method,
-            }
-        });
+                return {
+                    id: u.id,
+                    displayName: hasResident
+                        ? u.resident.fullName
+                        : guests[0] ?? 'Khách',
+                    room: hasResident && u.resident.apartment
+                        ? `${u.resident.apartment.building} - ${u.resident.apartment.roomNumber}`
+                        : '-',
+                    totalPeople: guests.length + (hasResident ? 1 : 0),
+                    serviceName: u.service.serviceName,
+                    checkInTime: u.checkInTime,
+                    method: u.method,
+                };
+            })
+        };
     }
 
     async currentCheckOuts(checkinId: number) {

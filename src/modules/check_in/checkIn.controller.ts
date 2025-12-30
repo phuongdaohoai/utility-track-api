@@ -1,10 +1,11 @@
-import { Body, Controller, Post, UseGuards, Req, Get } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards, Req, Get, Query } from '@nestjs/common';
 import { CheckInService } from './checkIn.service';
 import { CreateCheckInDto } from './dto/create-checkin.dto';
 import { ApiResponse } from "../../common/response.dto";
 import { ResidentCheckInDto } from './dto/resident-check-in.dto';
 import { FindResidentDto } from './dto/find-resident.dto';
 import { ApiBody, ApiProperty } from '@nestjs/swagger';
+import { FilterCheckinDto } from './dto/filter-checkin.dto';
 
 
 @Controller('check-in')
@@ -12,8 +13,8 @@ export class CheckInController {
     constructor(private readonly checkInService: CheckInService) {
     }
     @Get('current-check-ins')
-    async getCurrentCheckIns() {
-        const result = await this.checkInService.getCurrentCheckIns();
+    async getCurrentCheckIns(@Query() filter: FilterCheckinDto) {
+        const result = await this.checkInService.getCurrentCheckIns(filter);
         return ApiResponse.ok(result);
     }
 
