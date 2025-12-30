@@ -1,14 +1,38 @@
-import { Body, Controller, Post, UseGuards, Req } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards, Req, Get } from '@nestjs/common';
 import { CheckInService } from './checkIn.service';
 import { CreateCheckInDto } from './dto/create-checkin.dto';
 import { ApiResponse } from "../../common/response.dto";
 import { ResidentCheckInDto } from './dto/resident-check-in.dto';
 import { FindResidentDto } from './dto/find-resident.dto';
+import { ApiBody, ApiProperty } from '@nestjs/swagger';
 
 
 @Controller('check-in')
 export class CheckInController {
     constructor(private readonly checkInService: CheckInService) {
+    }
+    @Get('current-check-ins')
+    async getCurrentCheckIns() {
+        const result = await this.checkInService.getCurrentCheckIns();
+        return ApiResponse.ok(result);
+    }
+
+    @Post('current-check-outs/:checkinId')
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                checkinId: {
+                    type: 'number',
+                    example: 1035,
+                },
+            },
+            required: ['checkinId'],
+        },
+    })
+    async currentCheckOuts(@Body('checkinId') checkinId: number) {
+        const result = await this.checkInService.currentCheckOuts(checkinId);
+        return ApiResponse.ok(result, "Check-out thành công!");
     }
 
     @Post('guests')

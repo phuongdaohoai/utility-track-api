@@ -26,6 +26,46 @@ export class CheckInService {
         private readonly systemConfigService: SystemService,
     ) { }
 
+    async getCurrentCheckIns() {
+        const usages = await this.serviceUsageRepo.find({
+            where: { checkOutTime: IsNull() },
+            relations: ['resident', 'service', 'resident.apartment'],
+            order: { checkInTime: 'DESC' },
+        });
+
+        return usages.map(u => {
+            const guests = parseGuests(u.additionalGuests);
+            const hasResident = !!u.resident;
+
+            const displayName = hasResident ? u.resident.fullName : guests[0] ?? 'Khách';
+
+            const totalPeople = guests.length + (hasResident ? 1 : 0);
+
+            return {
+                id: u.id,
+                displayName: displayName,
+                room: hasResident && u.resident.apartment ? `${u.resident.apartment.building} - ${u.resident.apartment.roomNumber}` : "-",
+                totalPeople: totalPeople,
+                servicenAME: u.service.serviceName,
+                checkInTime: u.checkInTime,
+                method: u.method,
+            }
+        });
+    }
+
+    async currentCheckOuts(checkinId: number) {
+        const usage = await this.serviceUsageRepo.findOne({
+            where: { id: checkinId, checkOutTime: IsNull() },
+            relations: ['resident', 'service', 'resident.apartment'],
+        });
+
+        if (!usage) {
+            throw new NotFoundException(ERROR_CODE.CHECKIN_NOT_FOUND, "Không tìm thấy thông tin check-in");
+        }
+
+        usage.checkOutTime = new Date();
+        return await this.serviceUsageRepo.save(usage);
+    }
 
 
     async createCheckIn(data: CreateCheckInDto, staffId: number) {
@@ -217,4 +257,11 @@ export class CheckInService {
             additionalGuests: dto.additionalGuests || []
         };
     }
-}   
+}
+function parseGuests(guests?: string | null): string[] {
+    if (!guests) return [];
+    return guests
+        .split(',')
+        .map(g => g.trim())
+        .filter(Boolean);
+}
