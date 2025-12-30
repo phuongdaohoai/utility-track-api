@@ -9,6 +9,7 @@ import { ServiceUsageHistories } from "src/entities/service-usage-histories.enti
 import { ServiceUsageMethod } from "./dto/service-usage-method.dto";
 import { Services } from 'src/entities/services.entity'
 import { SystemService } from '../system_config/system_config.service';
+import { FindResidentDto } from "./dto/find-resident.dto";
 @Injectable()
 export class CheckInService {
     constructor(
@@ -57,7 +58,7 @@ export class CheckInService {
             where: {
                 phone: guestPhone,
                 serviceId: serviceId,
-                checkOutTime: IsNull() 
+                checkOutTime: IsNull()
             }
         });
 
@@ -72,7 +73,7 @@ export class CheckInService {
 
             return {
                 checkinId: savedOut.id,
-                status: 'CHECK_OUT', 
+                status: 'CHECK_OUT',
                 message: `Đã Check-out cho khách: ${savedOut.additionalGuests}`,
                 checkInTime: savedOut.checkInTime,
                 checkOutTime: savedOut.checkOutTime,
@@ -118,22 +119,22 @@ export class CheckInService {
             apartment: null
         };
     }
-    async findResident(qrCode?: string, faceDescriptor?: number[]): Promise<Residents> {
-        if (qrCode) {
+    async findResident(dto: FindResidentDto): Promise<Residents> {
+        if (dto.qrCode) {
             const resident = await this.residentRepo.findOne({
-                where: { qrCode: qrCode },
+                where: { qrCode: dto.qrCode },
                 relations: ['apartment'],
             });
             if (resident) return resident;
         }
 
-        if (faceDescriptor && faceDescriptor.length === 128) {
+        if (dto.faceDescriptor && dto.faceDescriptor.length === 128) {
             const residents = await this.residentRepo.find({ relations: ['apartment'] });
             for (const res of residents) {
                 if (!res.faceIdData) continue;
                 try {
                     const stored = JSON.parse(res.faceIdData.toString());
-                    const distance = this.euclideanDistance(faceDescriptor, stored);
+                    const distance = this.euclideanDistance(dto.faceDescriptor, stored);
                     if (distance < 0.6) return res;
                 } catch (e) { }
             }
@@ -153,8 +154,11 @@ export class CheckInService {
         if (!dto.qrCode && !dto.faceDescriptor) {
             throw new BadRequestException(ERROR_CODE.CHECKIN_INVALID_RESIDENT, 'Cư dân không hợp lệ! Vui lòng thử lại.');
         }
-
-        const resident = await this.findResident(dto.qrCode, dto.faceDescriptor);
+        const data: FindResidentDto = {
+            qrCode: dto.qrCode,
+            faceDescriptor: dto.faceDescriptor
+        }
+        const resident = await this.findResident(data);
 
 
         const activeUsage = await this.serviceUsageRepo.findOne({
