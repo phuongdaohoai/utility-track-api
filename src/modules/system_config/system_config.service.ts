@@ -130,5 +130,11 @@ export class SystemService {
         }
     }
 
+    //Phuong thuc lay key
+    async getConfigValue(key: string): Promise<string | null> {
+        const config = await this.repo.findOne({ where: { configKey: key } });
+        return config ? config.configValue : null;
+    }
+
 }
 

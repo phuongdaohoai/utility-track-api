@@ -7,6 +7,7 @@ import { SystemConfigController } from "../system_config/system_config.controlle
 @Module({
     imports: [TypeOrmModule.forFeature([SystemConfigs])],
     controllers: [SystemConfigController],
-    providers: [SystemService]
+    providers: [SystemService],
+    exports: [SystemService]
 })
 export class SystemConfigModule { }
