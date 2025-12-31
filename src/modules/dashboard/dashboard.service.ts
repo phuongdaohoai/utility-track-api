@@ -25,6 +25,8 @@ export class DashboardService {
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
+
+
         const [
             checkInOutStats,
             revenueStats,
@@ -34,7 +36,7 @@ export class DashboardService {
             this.getCheckInOutStats(),
             this.getRevenueStats(today, tomorrow),
             this.getResidentsCurrentlyCheckedIn(),
-            this.getServiceUsageChartData(groupBy,fromDate,toDate),
+            this.getServiceUsageChartData(groupBy, fromDate, toDate),
 
         ]);
         return {
@@ -112,9 +114,14 @@ export class DashboardService {
         fromDate?: Date,
         toDate?: Date,) {
         const datePartMap = {
-            day: 'CAST(suh.check_in_time AS DATE)',
+            day: `
+                    CONVERT(varchar(10), 
+                        suh.check_in_time AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time', 
+                        120
+                    )  -- 120 = yyyy-mm-dd
+                    `,
 
-            month: "FORMAT(suh.check_in_time, 'yyyy-MM')",
+            month: "YEAR(suh.check_in_time), MONTH(suh.check_in_time)",
 
             year: 'YEAR(suh.check_in_time)',
 
@@ -150,13 +157,25 @@ export class DashboardService {
             .select(datePartMap[groupBy], 'Period')
             .addSelect('service.service_name', 'ServiceName')
             .addSelect('COUNT(suh.id)', 'UsageCount');
-
+        
+        
         if (fromDate) {
-            query.andWhere('suh.check_in_time >= :fromDate', { fromDate });
+            // fromDate là Date object ở local (hoặc UTC? tùy bạn truyền vào)
+            // Chuyển về UTC midnight
+            const startOfDayUtc = new Date(Date.UTC(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate(), 0, 0, 0, 0));
+
+            query.andWhere(`
+      suh.check_in_time >= :fromDateUtc
+    `, { fromDateUtc: startOfDayUtc });
         }
 
         if (toDate) {
-            query.andWhere('suh.check_in_time < :toDate', { toDate });
+            // toDate là Date object đại diện ngày cuối
+            const endOfDay = new Date(Date.UTC(toDate.getFullYear(), toDate.getMonth(), toDate.getDate(), 23, 59, 59, 999));
+
+            query.andWhere(`
+      suh.check_in_time <= :toDateUtc
+    `, { toDateUtc: endOfDay });
         }
 
         query
@@ -171,9 +190,7 @@ export class DashboardService {
 
         const structuredData = rawData.reduce((acc, item) => {
             // Ép buộc Period thành chuỗi YYYY-MM-DD để so sánh được
-            const periodKey = item.Period instanceof Date
-                ? item.Period.toISOString().substring(0, 10) // Lấy YYYY-MM-DD
-                : String(item.Period);
+            const periodKey = item.Period
 
             const serviceName = item.ServiceName;
             const usageCount = parseInt(item.UsageCount);
