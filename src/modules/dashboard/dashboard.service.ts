@@ -189,23 +189,39 @@ export class DashboardService {
             .addSelect('COUNT(suh.id)', 'UsageCount');
 
 
-        if (fromDate) {
-            // fromDate là Date object ở local (hoặc UTC? tùy bạn truyền vào)
-            // Chuyển về UTC midnight
-            const startOfDayUtc = new Date(Date.UTC(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate(), 0, 0, 0, 0));
+        if (fromDate || toDate) {
+            const conditions: string[] = [];
+            const parameters: any = {};
 
-            query.andWhere(`
-      suh.check_in_time >= :fromDateUtc
-    `, { fromDateUtc: startOfDayUtc });
-        }
+            if (fromDate) {
+                // fromDate là ngày bắt đầu theo giờ Việt Nam → 00:00:00 giờ VN
+                const fromVn = new Date(fromDate);
+                // Đảm bảo là midnight theo giờ local (hoặc bạn có thể force UTC rồi adjust)
+                fromVn.setHours(0, 0, 0, 0);
 
-        if (toDate) {
-            // toDate là Date object đại diện ngày cuối
-            const endOfDay = new Date(Date.UTC(toDate.getFullYear(), toDate.getMonth(), toDate.getDate(), 23, 59, 59, 999));
+                conditions.push(`
+            suh.check_in_time AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time' 
+            >= :fromVn
+        `);
+                parameters.fromVn = fromVn.toISOString(); // hoặc format YYYY-MM-DD HH:mm:ss
+            }
 
-            query.andWhere(`
-      suh.check_in_time <= :toDateUtc
-    `, { toDateUtc: endOfDay });
+            if (toDate) {
+                // toDate là ngày kết thúc → lấy đến HẾT ngày đó theo giờ VN
+                // → tức < ngày hôm sau 00:00 giờ VN
+                const toVnEnd = new Date(toDate);
+                toVnEnd.setHours(0, 0, 0, 0);
+                toVnEnd.setDate(toVnEnd.getDate() + 1); // đúng: sang ngày hôm sau
+
+                // Nhưng quan trọng: phải đảm bảo toVnEnd là đúng múi giờ
+                conditions.push(`
+            suh.check_in_time AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time' 
+            < :toVnEnd
+        `);
+                parameters.toVnEnd = toVnEnd.toISOString();
+            }
+
+            query.andWhere(`(${conditions.join(' AND ')})`, parameters);
         }
 
         query
