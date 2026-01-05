@@ -193,37 +193,29 @@ export class DashboardService {
             const conditions: string[] = [];
             const parameters: any = {};
 
-            if (fromDate) {
-                // fromDate là ngày bắt đầu theo giờ Việt Nam → 00:00:00 giờ VN
-                const fromVn = new Date(fromDate);
-                // Đảm bảo là midnight theo giờ local (hoặc bạn có thể force UTC rồi adjust)
-                fromVn.setHours(0, 0, 0, 0);
+           if (fromDate) {
+      query.andWhere(
+        `
+        CAST(
+          suh.check_in_time AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time'
+          AS DATE
+        ) >= :fromDate
+      `,
+        { fromDate: fromDate.toISOString().slice(0, 10) },
+      );
+    }
 
-                conditions.push(`
-            suh.check_in_time AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time' 
-            >= :fromVn
-        `);
-                parameters.fromVn = fromVn.toISOString(); // hoặc format YYYY-MM-DD HH:mm:ss
-            }
-
-            if (toDate) {
-                // toDate là ngày kết thúc → lấy đến HẾT ngày đó theo giờ VN
-                // → tức < ngày hôm sau 00:00 giờ VN
-                const toVnEnd = new Date(toDate);
-                toVnEnd.setHours(0, 0, 0, 0);
-                toVnEnd.setDate(toVnEnd.getDate() + 1); // đúng: sang ngày hôm sau
-
-                // Nhưng quan trọng: phải đảm bảo toVnEnd là đúng múi giờ
-                conditions.push(`
-            suh.check_in_time AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time' 
-            < :toVnEnd
-        `);
-                parameters.toVnEnd = toVnEnd.toISOString();
-            }
-
-            query.andWhere(`(${conditions.join(' AND ')})`, parameters);
-        }
-
+    if (toDate) {
+      query.andWhere(
+        `
+        CAST(
+          suh.check_in_time AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time'
+          AS DATE
+        ) <= :toDate
+      `,
+        { toDate: toDate.toISOString().slice(0, 10) },
+      );
+    }}
         query
             .groupBy(datePartMap[groupBy])
             .addGroupBy('service.service_name')
