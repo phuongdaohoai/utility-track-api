@@ -34,7 +34,7 @@ export class DashboardService {
             usageChartData
         ] = await Promise.all([
             this.getCheckInOutStats(),
-            this.getRevenueStats(today, tomorrow),
+            this.getRevenueStats(),
             this.getResidentsCurrentlyCheckedIn(),
             this.getServiceUsageChartData(groupBy, fromDate, toDate),
 
@@ -54,21 +54,34 @@ export class DashboardService {
         const result = await this.serviceUsageRepo
             .createQueryBuilder('cio')
             .select(`
-      COUNT(
-        CASE 
-          WHEN CAST(cio.check_in_time AS DATE) = CAST(GETDATE() AS DATE)
-          THEN 1 
-        END
-      )
-    `, 'TotalCheckInsToday')
+            COUNT(
+                CASE 
+                    WHEN CAST(
+                        cio.check_in_time AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time' 
+                        AS DATE
+                    ) = CAST(
+                        GETUTCDATE() AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time' 
+                        AS DATE
+                    )
+                    THEN 1 
+                END
+            )
+        `, 'TotalCheckInsToday')
             .addSelect(`
-      COUNT(
-        CASE 
-          WHEN CAST(cio.check_out_time AS DATE) = CAST(GETDATE() AS DATE)
-          THEN 1 
-        END
-      )
-    `, 'TotalCheckOutsToday')
+            COUNT(
+                CASE 
+                    WHEN cio.check_out_time IS NOT NULL
+                    AND CAST(
+                        cio.check_out_time AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time' 
+                        AS DATE
+                    ) = CAST(
+                        GETUTCDATE() AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time' 
+                        AS DATE
+                    )
+                    THEN 1 
+                END
+            )
+        `, 'TotalCheckOutsToday')
             .getRawOne();
 
         return {
@@ -79,28 +92,40 @@ export class DashboardService {
 
 
 
-    private async getRevenueStats(today: Date, tomorrow: Date) {
-        const todayStr = today.toISOString();
-        const tomorrowStr = tomorrow.toISOString();
-
-        const result = await this.serviceUsageRepo.createQueryBuilder('suh')
+    private async getRevenueStats() {
+        const result = await this.serviceUsageRepo
+            .createQueryBuilder('suh')
             .leftJoin('suh.service', 'service')
             .select('COALESCE(SUM(service.price), 0)', 'TotalRevenueToday')
-            .where('suh.check_in_time >= :today AND suh.check_in_time < :tomorrow')
-            .setParameters({ today: todayStr, tomorrow: tomorrowStr })
+            .where(`
+            suh.check_in_time AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time'
+            >= CAST(GETUTCDATE() AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time' AS DATE)
+            AND
+            suh.check_in_time AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time'
+            < DATEADD(DAY, 1, CAST(GETUTCDATE() AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time' AS DATE))
+        `)
             .getRawOne();
 
         return {
             totalRevenueToday: parseFloat(result.TotalRevenueToday) || 0,
         };
     }
+
     private async getResidentsCurrentlyCheckedIn() {
         const result = await this.serviceUsageRepo
             .createQueryBuilder('cio')
             .select('COUNT(DISTINCT cio.resident_id)', 'residentsCurrentlyInArea')
             .where('cio.check_out_time IS NULL')
             .andWhere('cio.resident_id IS NOT NULL')
-            .andWhere('CAST(cio.check_in_time AS DATE) = CAST(GETDATE() AS DATE)')
+            .andWhere(`
+            CAST(
+                cio.check_in_time AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time'
+                AS DATE
+            ) = CAST(
+                GETUTCDATE() AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time'
+                AS DATE
+            )
+        `)
             .getRawOne();
 
         return {
