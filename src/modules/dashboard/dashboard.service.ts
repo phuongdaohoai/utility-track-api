@@ -121,7 +121,12 @@ export class DashboardService {
                     )  -- 120 = yyyy-mm-dd
                     `,
 
-            month: "YEAR(suh.check_in_time), MONTH(suh.check_in_time)",
+            month: `
+                    FORMAT(
+                        suh.check_in_time AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time',
+                        'yyyy-MM'
+                    )
+                `,
 
             year: 'YEAR(suh.check_in_time)',
 
@@ -157,8 +162,8 @@ export class DashboardService {
             .select(datePartMap[groupBy], 'Period')
             .addSelect('service.service_name', 'ServiceName')
             .addSelect('COUNT(suh.id)', 'UsageCount');
-        
-        
+
+
         if (fromDate) {
             // fromDate là Date object ở local (hoặc UTC? tùy bạn truyền vào)
             // Chuyển về UTC midnight
