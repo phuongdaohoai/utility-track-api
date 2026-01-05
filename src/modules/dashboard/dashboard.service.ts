@@ -189,25 +189,33 @@ export class DashboardService {
             .addSelect('COUNT(suh.id)', 'UsageCount');
 
 
-        if (fromDate) {
-            // fromDate là Date object ở local (hoặc UTC? tùy bạn truyền vào)
-            // Chuyển về UTC midnight
-            const startOfDayUtc = new Date(Date.UTC(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate(), 0, 0, 0, 0));
+        if (fromDate || toDate) {
+            const conditions: string[] = [];
+            const parameters: any = {};
 
-            query.andWhere(`
-      suh.check_in_time >= :fromDateUtc
-    `, { fromDateUtc: startOfDayUtc });
-        }
+           if (fromDate) {
+      query.andWhere(
+        `
+        CAST(
+          suh.check_in_time AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time'
+          AS DATE
+        ) >= :fromDate
+      `,
+        { fromDate: fromDate.toISOString().slice(0, 10) },
+      );
+    }
 
-        if (toDate) {
-            // toDate là Date object đại diện ngày cuối
-            const endOfDay = new Date(Date.UTC(toDate.getFullYear(), toDate.getMonth(), toDate.getDate(), 23, 59, 59, 999));
-
-            query.andWhere(`
-      suh.check_in_time <= :toDateUtc
-    `, { toDateUtc: endOfDay });
-        }
-
+    if (toDate) {
+      query.andWhere(
+        `
+        CAST(
+          suh.check_in_time AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time'
+          AS DATE
+        ) <= :toDate
+      `,
+        { toDate: toDate.toISOString().slice(0, 10) },
+      );
+    }}
         query
             .groupBy(datePartMap[groupBy])
             .addGroupBy('service.service_name')
