@@ -19,7 +19,6 @@ export default class ServiceUsageService {
             .leftJoin("history.resident", "resident")
             .leftJoin("history.service", "service")
             .leftJoin("history.staff", "staff")
-            .leftJoin("history.checkInOut", "checkInOut")
             .leftJoin("resident.apartment", "apartment")
             .select(
                 [
@@ -27,6 +26,9 @@ export default class ServiceUsageService {
                     "history.id",
                     "history.usageTime",
                     "history.additionalGuests",
+                    "history.method",
+                    "history.checkInTime",
+                    "history.checkOutTime",
 
                     // --- 2. Bảng Resident ---
                     "resident.id",
@@ -39,12 +41,6 @@ export default class ServiceUsageService {
                     "apartment.building",
                     "apartment.roomNumber",
                     "apartment.floorNumber",
-
-                    // --- . Bảng CheckInOut ---
-                    "checkInOut.id",
-                    "checkInOut.method",
-                    "checkInOut.checkInTime",
-                    "checkInOut.checkOutTime",
 
                     // --- . Bảng Service ---
                     "service.id",
@@ -104,12 +100,60 @@ export default class ServiceUsageService {
                 },
                 service: true,
                 staff: true,
-                checkInOut: true
             },
         });
         if (!history) {
-            throw new NotFoundException(ERROR_CODE.HISTORY_NOT_FOUND);
+            throw new NotFoundException(ERROR_CODE.HISTORY_NOT_FOUND)
         }
-        return history;
+        const guests = parseGuests(history.additionalGuests)
+        let displayName = ''
+        let total = 0
+        let remainingNames = ''
+        if (history.resident) {
+            displayName = history.resident.fullName
+            remainingNames = guests.join(', ');
+            total = 1 + guests.length
+        } else {
+            displayName = guests.length > 0 ? guests[0] : 'Khách vãng lai'
+            remainingNames = guests.slice(1).join(', ');
+            total = guests.length > 0 ? guests.length : 1
+        }
+        return {
+            id: history.id,
+            usageTime: history.usageTime,
+            item: {
+                displayName: displayName,
+                remainingNames: [
+                    remainingNames
+                ],
+                totalGuests: total,
+                checkInTime: history.checkInTime,
+                checkOutTime: history.checkOutTime,
+                method: history.method,
+                phone: history.resident?.phone || history.phone,
+            },
+            apartment: history.resident?.apartment
+                ? `${history.resident.apartment.building} - ${history.resident.apartment.roomNumber}`
+                : null,
+            service: {
+                id: history.service?.id,
+                serviceName: history.service.serviceName || 'Dịch vụ không xác định',
+                price: history.service.price || 0,
+                capacity: history.service.capacity,
+            },
+            staff: history.staff ? {
+                id: history.staff.id,
+                fullName: history.staff.fullName,
+            } : null
+        };
+
+
+        function parseGuests(guests?: string | null): string[] {
+            if (!guests) return [];
+            return guests
+                .split(',')
+                .map(g => g.trim())
+                .filter(Boolean);
+        }
     }
 }
