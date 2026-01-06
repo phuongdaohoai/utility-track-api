@@ -3,6 +3,11 @@ import { Type } from "class-transformer";
 import { IsNumber, IsOptional, IsString } from "class-validator";
 
 export class FilterCheckinDto {
+    @ApiProperty({ required: false, enum: ['resident', 'guest'] })
+    @IsOptional()
+    @IsString()
+    type?: 'resident' | 'guest';
+
     @ApiProperty({ required: false })
     @IsOptional()
     @IsString()
@@ -19,4 +24,6 @@ export class FilterCheckinDto {
     @Type(() => Number)
     @IsNumber()
     pageSize?: number;
+
+
 }

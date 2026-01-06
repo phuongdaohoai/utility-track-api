@@ -30,11 +30,21 @@ export class CheckInService {
 
     async getCurrentCheckIns(filter: FilterCheckinDto) {
 
-        const qb = this.serviceUsageRepo.createQueryBuilder('serviceUsageHistories').leftJoinAndSelect('serviceUsageHistories.resident', 'resident')
+        const qb = this.serviceUsageRepo
+            .createQueryBuilder('serviceUsageHistories')
+            .leftJoinAndSelect('serviceUsageHistories.resident', 'resident')
             .leftJoinAndSelect('resident.apartment', 'apartment')
             .leftJoinAndSelect('serviceUsageHistories.service', 'service')
             .where('serviceUsageHistories.checkOutTime IS NULL');
 
+        if (filter.type === 'resident') {
+            qb.andWhere('serviceUsageHistories.resident IS NOT NULL');
+        }
+
+        if (filter.type === 'guest') {
+            qb.andWhere('serviceUsageHistories.resident IS NULL');
+        }
+        
         const result = await QueryHelper.apply(qb, filter, {
             alias: 'serviceUsageHistories',
             searchFields: [
