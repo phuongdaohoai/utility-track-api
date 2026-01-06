@@ -65,6 +65,7 @@ export const ERROR_CODE = {
     CHECKIN_NOT_FOUND: 'CHECKIN_NOT_FOUND', // Không tìm thấy thông tin check-in theo ID
     CHECKIN_INVALID_RESIDENT: 'CHECKIN_INVALID_RESIDENT', // Cư dân không hợp lệ
     CHECKIN_NO_ACTIVE_CHECKIN: 'CHECKIN_NO_ACTIVE_CHECKIN', // Không có check-in đang hoạt động
+    CHECKIN_INVALID_GUESTS: 'CHECKIN_INVALID_GUESTS', // Danh sách khách không hợp lệ
 } as const;
 
 
