@@ -18,6 +18,13 @@ export class CheckInController {
         return ApiResponse.ok(result);
     }
 
+    @Get('get-all-check-ins')
+    async getAllCurrentCheckIns() {
+        const result = await this.checkInService.getAllCurrentCheckIns();
+        return ApiResponse.ok(result);
+    }
+
+
     @Post('current-check-outs/:checkinId')
     @ApiBody({
         schema: {
