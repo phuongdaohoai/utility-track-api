@@ -44,7 +44,8 @@ export class CheckInService {
         if (filter.type === 'guest') {
             qb.andWhere('serviceUsageHistories.resident IS NULL');
         }
-        
+
+
         const result = await QueryHelper.apply(qb, filter, {
             alias: 'serviceUsageHistories',
             searchFields: [
@@ -73,13 +74,49 @@ export class CheckInService {
                     room: hasResident && u.resident.apartment
                         ? `${u.resident.apartment.building} - ${u.resident.apartment.roomNumber}`
                         : '-',
+                    phone: u.phone,
                     totalPeople: guests.length + (hasResident ? 1 : 0),
+                    additionalGuests: hasResident ? guests : guests.slice(1),
                     serviceName: u.service.serviceName,
                     checkInTime: u.checkInTime,
                     method: u.method,
                 };
             })
         };
+    }
+    async getAllCurrentCheckIns() {
+        const items = await this.serviceUsageRepo
+            .createQueryBuilder('serviceUsageHistories')
+            .leftJoinAndSelect('serviceUsageHistories.resident', 'resident')
+            .leftJoinAndSelect('resident.apartment', 'apartment')
+            .leftJoinAndSelect('serviceUsageHistories.service', 'service')
+            .where('serviceUsageHistories.checkOutTime IS NULL')
+            .orderBy('serviceUsageHistories.checkInTime', 'DESC')
+            .getMany();;
+
+
+        return items.map(u => {
+            const guests = parseGuests(u.additionalGuests);
+            const hasResident = !!u.resident;
+
+            return {
+                id: u.id,
+                displayName: hasResident
+                    ? u.resident.fullName
+                    : guests[0] ?? 'Khách',
+                room: hasResident && u.resident.apartment
+                    ? `${u.resident.apartment.building} - ${u.resident.apartment.roomNumber}`
+                    : '-',
+                phone: u.phone,
+
+                totalPeople: guests.length + (hasResident ? 1 : 0),
+                additionalGuests: hasResident ? guests : guests.slice(1),
+                serviceName: u.service.serviceName,
+                checkInTime: u.checkInTime,
+                method: u.method,
+            };
+        })
+
     }
 
     async currentCheckOuts(checkinId: number) {
@@ -294,3 +331,4 @@ function parseGuests(guests?: string | null): string[] {
         .map(g => g.trim())
         .filter(Boolean);
 }
+
