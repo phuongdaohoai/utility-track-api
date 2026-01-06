@@ -12,6 +12,7 @@ import { SystemService } from '../system_config/system_config.service';
 import { FindResidentDto } from "./dto/find-resident.dto";
 import { QueryHelper } from "src/common/helper/query.helper";
 import { FilterCheckinDto } from "./dto/filter-checkin.dto";
+import { PartialCheckoutDto } from "./dto/partial-check-out.dto";
 @Injectable()
 export class CheckInService {
     constructor(
@@ -249,6 +250,30 @@ export class CheckInService {
         throw new BadRequestException(ERROR_CODE.CHECKIN_INVALID_RESIDENT, 'Cư dân không hợp lệ! Vui lòng thử lại.');
     }
 
+    async partialCheckout(checkinId: number, dto: PartialCheckoutDto) {
+        if (!dto.guestsToCheckout || dto.guestsToCheckout.length === 0) {
+            throw new BadRequestException(ERROR_CODE.CHECKIN_INVALID_GUESTS, 'Chưa chọn người cần checkout');
+        }
+
+        const usage = await this.serviceUsageRepo.findOne({
+            where: { id: checkinId, checkOutTime: IsNull() },
+            relations: ['resident'],
+        })
+
+        if (!usage) {
+            throw new NotFoundException(ERROR_CODE.CHECKIN_NOT_FOUND, "Không tìm thấy thông tin check-in")
+        }
+
+        const guests = parseGuests(usage.additionalGuests);
+
+        const remainingGuests = guests.filter(g => !dto.guestsToCheckout.includes(g));
+
+        usage.additionalGuests = remainingGuests.length ? remainingGuests.join(',') : null;
+        
+        await this.serviceUsageRepo.save(usage);
+
+        return usage;
+    }
     private euclideanDistance(a: number[], b: number[]): number {
         return Math.sqrt(a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0));
     }
