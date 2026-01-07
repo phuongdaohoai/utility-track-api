@@ -139,7 +139,6 @@ export class CheckInService {
 
         await this.systemConfigService.validateAccess('MANUAL');
 
-        // BƯỚC 2: Check xem có cho phép Check-in khách không? (Logic Key riêng)
         const allowGuest = await this.systemConfigService.getConfigValue('GUEST_CHECKIN');
 
         if (allowGuest === '0') {
@@ -195,6 +194,10 @@ export class CheckInService {
         // ---------------------------------------------------------
         // TRƯỜNG HỢP B: CHƯA CÓ -> THỰC HIỆN CHECK-IN (Tạo mới)
         // ---------------------------------------------------------
+        const guestNameArr = guestName.split(',');
+        const additionalGuestsArr = guestNameArr?.length > 1 ? guestNameArr.slice(1) : [];
+
+
         const newCheckIn = new ServiceUsageHistories();
 
         newCheckIn.staffId = staffId;
@@ -204,10 +207,18 @@ export class CheckInService {
 
         // Info khách
         newCheckIn.residentId = null;
-        newCheckIn.additionalGuests = guestName || 'Khách vãng lai';
         newCheckIn.phone = guestPhone;
+        newCheckIn.additionalGuests = additionalGuestsArr.length > 0 ? additionalGuestsArr.join(',') : null;
 
         const savedIn = await this.serviceUsageRepo.save(newCheckIn);
+
+        const members = [
+            { stt: 1, fullName: guestNameArr[0] },
+            ...additionalGuestsArr.map((name, idx) => ({
+                stt: idx + 2,
+                fullName: name,
+            })),
+        ];
 
         return {
             checkinId: savedIn.id,
@@ -217,11 +228,13 @@ export class CheckInService {
             checkOutTime: null,
 
             serviceName: serviceNameDisplay,
-            representative: guestName,
+            representative: guestNameArr[0],
             phoneNumber: guestPhone,
 
-            quantity: 1,
-            members: [{ stt: 1, fullName: guestName }],
+            additionalGuests: additionalGuestsArr,
+            totalPeople: members.length,
+            members,
+
             type: 'GUEST',
             apartment: null
         };
@@ -269,7 +282,7 @@ export class CheckInService {
         const remainingGuests = guests.filter(g => !dto.guestsToCheckout.includes(g));
 
         usage.additionalGuests = remainingGuests.length ? remainingGuests.join(',') : null;
-        
+
         await this.serviceUsageRepo.save(usage);
 
         return usage;
