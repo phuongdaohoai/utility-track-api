@@ -12,42 +12,43 @@ import { UpdateServiceDto } from './dto/update-service.dto';
 import request from 'supertest';
 
 @Controller('services-used')
-@ApiBearerAuth('Authorization')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ServicesUsedController {
     constructor(
         private service: ServicesUsedService
     ) { }
 
     @Get('getAll')
-    @Permissions('Services.View')
     async getAll(@Query() query: FilterServiceDto) {
         const result = await this.service.findAll(query);
         return ApiResponse.ok(result);
     }
-
     @Get('getById/:id')
+    @ApiBearerAuth('Authorization')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @Permissions('Services.View')
     async getById(@Param('id') id: number) {
-        const result= await this.service.findById(id);
+        const result = await this.service.findById(id);
         return ApiResponse.ok(result);
     }
-
     @Post('create')
+    @ApiBearerAuth('Authorization')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @Permissions('Services.Create')
     async create(@Body() dto: CreateServiceDto, @Req() req) {
         const result = await this.service.create(dto, req.user.staffId);
         return ApiResponse.ok(result, "Thêm Dịch Vụ Thành Công");
     }
-
     @Put('update/:id')
+    @ApiBearerAuth('Authorization')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @Permissions('Services.Update')
     async update(@Body() dto: UpdateServiceDto, @Req() req, @Param('id') id: number) {
         const result = await this.service.update(id, dto, req.user.staffId);
         return ApiResponse.ok(result);
     }
-
     @Delete('delete/:id')
+    @ApiBearerAuth('Authorization')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @Permissions('Services.Delete')
     async delete(@Req() req, @Param('id') id: number) {
         const result = await this.service.remove(id, req.user.staffId);
