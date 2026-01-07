@@ -12,15 +12,15 @@ import { UpdateServiceDto } from './dto/update-service.dto';
 import request from 'supertest';
 
 @Controller('services-used')
-// @ApiBearerAuth('Authorization')
-// @UseGuards(JwtAuthGuard, PermissionsGuard)
+@ApiBearerAuth('Authorization')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ServicesUsedController {
     constructor(
         private service: ServicesUsedService
     ) { }
 
     @Get('getAll')
-    // @Permissions('Services.View')
+    @Permissions('Services.View')
     async getAll(@Query() query: FilterServiceDto) {
         const result = await this.service.findAll(query);
         return ApiResponse.ok(result);
