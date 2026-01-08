@@ -208,7 +208,7 @@ export class CheckInService {
         // Info khách
         newCheckIn.residentId = null;
         newCheckIn.phone = guestPhone;
-        newCheckIn.additionalGuests = additionalGuestsArr.length > 0 ? additionalGuestsArr.join(',') : null;
+        newCheckIn.additionalGuests = guestNameArr.length > 0 ? guestNameArr.join(',') : null;
 
         const savedIn = await this.serviceUsageRepo.save(newCheckIn);
 
