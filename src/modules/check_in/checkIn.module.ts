@@ -7,9 +7,10 @@ import { Services } from "src/entities/services.entity";
 import { ServiceUsageHistories } from "src/entities/service-usage-histories.entity";
 import { SystemConfigModule } from '../system_config/system_config.module';
 import { StaffAttendances } from "src/entities/staff-attendances.entity";
+import { Staffs } from "src/entities/staffs.entity";
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Services, Residents, ServiceUsageHistories,StaffAttendances]),
+    imports: [TypeOrmModule.forFeature([Services, Residents, ServiceUsageHistories, StaffAttendances, Staffs]),
         SystemConfigModule
     ],
     controllers: [CheckInController],

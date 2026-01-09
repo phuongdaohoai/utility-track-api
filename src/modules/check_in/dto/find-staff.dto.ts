@@ -8,9 +8,4 @@ export class FindStaffDto {
     @IsString()
     qrCode?: string;                       
 
-    @ApiProperty({ required: false, type: [Number] })
-    @IsOptional()
-    @IsArray()
-    @IsNumber({}, { each: true })
-    faceDescriptor?: number[]; 
 }

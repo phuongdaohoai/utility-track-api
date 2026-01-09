@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, IsArray, IsNumber } from 'class-validator';
+import { IsOptional, IsString} from 'class-validator';
 
 export class StaffCheckInDto {
    
@@ -8,10 +8,4 @@ export class StaffCheckInDto {
     @IsString()
     qrCode?: string;
 
-    @ApiProperty({ required: false, type: [Number] })
-    @IsOptional()
-    @IsArray()
-    @IsNumber({}, { each: true })
-    faceDescriptor?: number[];
-    
 }
