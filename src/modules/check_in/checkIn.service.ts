@@ -15,6 +15,7 @@ import { FilterCheckinDto } from "./dto/filter-checkin.dto";
 import { PartialCheckoutDto } from "./dto/partial-check-out.dto";
 import { FindStaffDto } from "./dto/find-staff.dto";
 import { StaffCheckInDto } from "./dto/staff-check-in.dto";
+import { Staffs } from "src/entities/staffs.entity";
 @Injectable()
 export class CheckInService {
     constructor(
@@ -27,6 +28,9 @@ export class CheckInService {
 
         @InjectRepository(Services)
         private serviceRepo: Repository<Services>,
+
+        @InjectRepository(Staffs)
+        private staffRepo: Repository<Staffs>,
 
         private readonly systemConfigService: SystemService,
     ) { }
@@ -87,6 +91,7 @@ export class CheckInService {
             })
         };
     }
+
     async getAllCurrentCheckIns() {
         const items = await this.serviceUsageRepo
             .createQueryBuilder('serviceUsageHistories')
@@ -135,7 +140,6 @@ export class CheckInService {
         usage.checkOutTime = new Date();
         return await this.serviceUsageRepo.save(usage);
     }
-
 
     async createCheckIn(data: CreateCheckInDto, staffId: number) {
 
@@ -241,6 +245,7 @@ export class CheckInService {
             apartment: null
         };
     }
+
     async findResident(dto: FindResidentDto): Promise<Residents> {
         if (dto.qrCode) {
             const resident = await this.residentRepo.findOne({
@@ -263,6 +268,16 @@ export class CheckInService {
         }
 
         throw new BadRequestException(ERROR_CODE.CHECKIN_INVALID_RESIDENT, 'Cư dân không hợp lệ! Vui lòng thử lại.');
+    }
+
+    async findStaff(dto: FindStaffDto): Promise<Staffs> {
+        if (dto.qrCode) {
+            const staff = await this.staffRepo.findOne({
+                where: { qrCode: dto.qrCode },
+            });
+            if (staff) return staff;
+        }
+        throw new BadRequestException(ERROR_CODE.STAFF_NOT_FOUND, 'Nhân viên không hợp lệ! Vui lòng thử lại.');
     }
 
     async partialCheckout(checkinId: number, dto: PartialCheckoutDto) {
@@ -289,9 +304,11 @@ export class CheckInService {
 
         return usage;
     }
+
     private euclideanDistance(a: number[], b: number[]): number {
         return Math.sqrt(a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0));
     }
+
     async residentCheckInOrOut(dto: ResidentCheckInDto) {
         const method = dto.qrCode ? ServiceUsageMethod.QR_CODE : ServiceUsageMethod.FACE_ID;
         const methodKey = method === ServiceUsageMethod.QR_CODE ? 'QR' : 'FACEID';
