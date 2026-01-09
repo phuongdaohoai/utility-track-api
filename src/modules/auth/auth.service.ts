@@ -1,12 +1,13 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Roles } from 'src/entities/roles.entity';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthService } from './jwt-auth.service';
 import { PasswordHelper } from 'src/common/helper/password.helper';
 import { Staffs } from 'src/entities/staffs.entity';
 import { ERROR_CODE } from 'src/common/constants/error-code.constant';
+import { StaffAttendances } from 'src/entities/staff-attendances.entity';
 
 @Injectable()
 export class AuthService {
@@ -17,16 +18,20 @@ export class AuthService {
         private repoStaff: Repository<Staffs>,
 
         @InjectRepository(Roles)
-        private roleRepo: Repository<Roles>
+        private roleRepo: Repository<Roles>,
 
+        @InjectRepository(StaffAttendances)
+        private staffAttendanceRepo: Repository<StaffAttendances>,
 
     ) { }
     async login(body: LoginDto) {
         const { email, password, qrCode } = body;
 
         let user: Staffs | null = null;
+        let loginMethod = "";
         if (qrCode) {
             user = await this.verifyQrCode(qrCode);
+            loginMethod = "QR Code";
         } else if (email && password) {
             // 1. Tìm user
             user = await this.findUserByEmail(email);
@@ -45,11 +50,11 @@ export class AuthService {
                     message: "Sai mật khẩu",
                 });
             }
-
+            loginMethod = "Email";
         } else {
             throw new BadRequestException({ errorCode: ERROR_CODE.AUTH_INVALID_CREDENTIALS, message: "Sai tài khoản hoặc mật khẩu" })
         }
-        return this.handleUserLogin(user);
+        return this.handleUserLogin(user, loginMethod);
 
     }
     private async verifyQrCode(qrCode: string) {
@@ -67,7 +72,7 @@ export class AuthService {
         }
         return staff
     }
-    private async handleUserLogin(user: Staffs) {
+    private async handleUserLogin(user: Staffs, loginMethod: string) {
         // 3. Check role
         const roleId = user.role.id ?? 0;
         if (roleId === 0) {
@@ -94,6 +99,8 @@ export class AuthService {
             });
         }
 
+        await this.trackAttendance(user.id, loginMethod);
+
         // 5. Generate token
         const accessToken = this.jwtAuthService.generateToken(
             user,
@@ -104,6 +111,33 @@ export class AuthService {
         return {
             accessToken,
         };
+    }
+    private async trackAttendance(staffId: number, loginMethod: string) {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+
+        const existingAttendance = await this.staffAttendanceRepo.findOne({
+            where: {
+                staffId: staffId,
+                checkInTime: Between(todayStart, todayEnd)
+            }
+        });
+
+        // Nếu chưa có check-in trong hôm nay thì tạo mới
+        if (!existingAttendance) {
+            const newAttendance = this.staffAttendanceRepo.create({
+                staffId: staffId,
+                checkInTime: new Date(),
+                checkOutTime: null,
+                deviceInfo: loginMethod,
+                note: "Tự động check-in khi đăng nhập",
+                // Bạn có thể lấy thêm deviceInfo từ request nếu muốn
+            });
+            await this.staffAttendanceRepo.save(newAttendance);
+        }
     }
     async findUserByEmail(email: string) {
         return this.repoStaff.findOne({

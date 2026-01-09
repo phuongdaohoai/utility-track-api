@@ -9,6 +9,7 @@ import { PermissionsGuard } from './guards/permissions.guard';
 import { Staffs } from 'src/entities/staffs.entity';
 import { Roles } from 'src/entities/roles.entity';
 import { Permissions } from 'src/entities/permissions.entity';
+import { StaffAttendances } from 'src/entities/staff-attendances.entity';
 
 @Module({
     imports: [
@@ -21,7 +22,7 @@ import { Permissions } from 'src/entities/permissions.entity';
                 algorithm: 'HS256',
             }
         }),
-        TypeOrmModule.forFeature([Staffs,Roles,Permissions])
+        TypeOrmModule.forFeature([Staffs,Roles,Permissions,StaffAttendances])
     ],
     providers: [JwtAuthService, JwtStrategy, AuthService,PermissionsGuard],
     exports: [
