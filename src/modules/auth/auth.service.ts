@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Roles } from 'src/entities/roles.entity';
-import { Between, Repository } from 'typeorm';
+import { Between, IsNull, Repository } from 'typeorm';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthService } from './jwt-auth.service';
 import { PasswordHelper } from 'src/common/helper/password.helper';
@@ -115,26 +115,25 @@ export class AuthService {
     private async trackAttendance(staffId: number, loginMethod: string) {
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
-
         const todayEnd = new Date();
         todayEnd.setHours(23, 59, 59, 999);
 
-        const existingAttendance = await this.staffAttendanceRepo.findOne({
+        // Tìm bản ghi của hôm nay MÀ CHƯA CHECK-OUT (checkOutTime is null)
+        const openAttendance = await this.staffAttendanceRepo.findOne({
             where: {
                 staffId: staffId,
-                checkInTime: Between(todayStart, todayEnd)
+                checkInTime: Between(todayStart, todayEnd),
+                checkOutTime: IsNull() 
             }
         });
 
-        // Nếu chưa có check-in trong hôm nay thì tạo mới
-        if (!existingAttendance) {
+        // Nếu không có bản ghi nào đang "mở", thì mới tạo bản ghi check-in mới
+        if (!openAttendance) {
             const newAttendance = this.staffAttendanceRepo.create({
                 staffId: staffId,
                 checkInTime: new Date(),
-                checkOutTime: null,
                 deviceInfo: loginMethod,
-                note: "Tự động check-in khi đăng nhập",
-                // Bạn có thể lấy thêm deviceInfo từ request nếu muốn
+                note: `Check-in lúc login (${loginMethod})`,
             });
             await this.staffAttendanceRepo.save(newAttendance);
         }
