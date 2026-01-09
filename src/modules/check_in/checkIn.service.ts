@@ -13,6 +13,7 @@ import { FindResidentDto } from "./dto/find-resident.dto";
 import { QueryHelper } from "src/common/helper/query.helper";
 import { FilterCheckinDto } from "./dto/filter-checkin.dto";
 import { PartialCheckoutDto } from "./dto/partial-check-out.dto";
+import { StaffAttendances } from "src/entities/staff-attendances.entity";
 @Injectable()
 export class CheckInService {
     constructor(
@@ -25,6 +26,10 @@ export class CheckInService {
 
         @InjectRepository(Services)
         private serviceRepo: Repository<Services>,
+
+        @InjectRepository(StaffAttendances)
+        private staffAttendancesRepo: Repository<StaffAttendances>,
+
 
         private readonly systemConfigService: SystemService,
     ) { }
@@ -85,6 +90,37 @@ export class CheckInService {
             })
         };
     }
+
+    async getCurrentCheckInsStaff(filter: FilterCheckinDto) {
+        const qb = this.staffAttendancesRepo
+            .createQueryBuilder('staffAttendances')
+            .leftJoinAndSelect('staffAttendances.staff', 'staff')
+            .where('staffAttendances.checkOutTime IS NULL');
+
+        const result = await QueryHelper.apply(qb, filter, {
+            alias: 'staffAttendances',
+            searchFields: [
+                'staff.fullName',
+            ],
+        });
+
+        return {
+            totalItem: result.totalItem,
+            page: result.page,
+            pageSize: result.pageSize,
+            items: result.items.map(u => {
+                return {
+                    id: u.id,
+                    displayName: u.staff.fullName,
+                    phone: u.staff.phone,
+                    checkInTime: u.checkInTime,
+                    checkOutTime: u.checkOutTime,
+                    method: u.deviceInfo,
+                };
+            })
+        };
+    }
+
     async getAllCurrentCheckIns() {
         const items = await this.serviceUsageRepo
             .createQueryBuilder('serviceUsageHistories')
