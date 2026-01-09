@@ -159,6 +159,8 @@ export class CheckInService {
         const serviceObj = await this.serviceRepo.findOne({ where: { id: serviceId } });
         const serviceNameDisplay = serviceObj ? serviceObj.serviceName : `Dịch vụ #${serviceId}`;
 
+        const priceAtUsage = Number(serviceObj?.price) || 0;
+
         // 3. TÌM KIẾM: Khách này có đang ở trong không
         const existingSession = await this.serviceUsageRepo.findOne({
             where: {
@@ -194,7 +196,10 @@ export class CheckInService {
         // ---------------------------------------------------------
         // TRƯỜNG HỢP B: CHƯA CÓ -> THỰC HIỆN CHECK-IN (Tạo mới)
         // ---------------------------------------------------------
-        const guestNameArr = guestName.split(',');
+        const guestNameArr = guestName.split(',').map(name => name.trim()).filter(Boolean);
+        const totalPeople = guestNameArr.length;
+        const totalAmount = priceAtUsage * totalPeople;
+
         const additionalGuestsArr = guestNameArr?.length > 1 ? guestNameArr.slice(1) : [];
 
 
@@ -204,11 +209,14 @@ export class CheckInService {
         newCheckIn.serviceId = serviceId;
         newCheckIn.method = ServiceUsageMethod.MANUAL;
         newCheckIn.checkInTime = new Date();
+        newCheckIn.phone = guestPhone;
+        newCheckIn.additionalGuests = guestNameArr.join(",");
 
         // Info khách
-        newCheckIn.residentId = null;
-        newCheckIn.phone = guestPhone;
-        newCheckIn.additionalGuests = guestNameArr.length > 0 ? guestNameArr.join(',') : null;
+        newCheckIn.priceAtUsage = priceAtUsage;
+        newCheckIn.totalAmount = totalAmount;
+        newCheckIn.paymentStatus = 1;
+
 
         const savedIn = await this.serviceUsageRepo.save(newCheckIn);
 
@@ -226,13 +234,15 @@ export class CheckInService {
             message: 'Check-in thành công!',
             checkInTime: savedIn.checkInTime,
             checkOutTime: null,
+            priceAtUsage,
+            totalAmount,
 
             serviceName: serviceNameDisplay,
             representative: guestNameArr[0],
             phoneNumber: guestPhone,
 
             additionalGuests: additionalGuestsArr,
-            totalPeople: members.length,
+            totalPeople: totalPeople,
             members,
 
             type: 'GUEST',
@@ -304,6 +314,8 @@ export class CheckInService {
         }
         const resident = await this.findResident(data);
 
+        const serviceObj = await this.serviceRepo.findOne({ where: { id: dto.serviceId } });
+        if (!serviceObj) throw new NotFoundException(ERROR_CODE.SERVICE_NOT_FOUND);
 
         const activeUsage = await this.serviceUsageRepo.findOne({
             where: {
@@ -313,7 +325,6 @@ export class CheckInService {
             },
             order: { checkInTime: 'DESC' },
         });
-        console.log('Active Usage:', activeUsage);
 
         if (activeUsage) {
             // Đây là lần quét thứ 2 → CHECK-OUT
@@ -337,6 +348,11 @@ export class CheckInService {
             };
         }
 
+        const priceAtUsage = Number(serviceObj?.price) || 0;
+        const guestCount = dto.additionalGuests ? dto.additionalGuests.length : 0;
+        const totalPeople = guestCount + 1;
+        const totalAmount = priceAtUsage * totalPeople;
+
         // Đây là lần quét đầu → CHECK-IN
         const newUsage = this.serviceUsageRepo.create({
             service: { id: dto.serviceId },
@@ -345,7 +361,11 @@ export class CheckInService {
             checkOutTime: null,
             method: method,
             additionalGuests: dto.additionalGuests ? dto.additionalGuests.join(', ') : null,
-            phone: resident.phone
+            phone: resident.phone,
+
+            priceAtUsage: priceAtUsage,
+            totalAmount: totalAmount,
+            paymentStatus: 0,
         });
 
         await this.serviceUsageRepo.save(newUsage);
@@ -358,7 +378,10 @@ export class CheckInService {
                 ? `${resident.apartment.building} - ${resident.apartment.roomNumber}`
                 : null,
             avatar: resident.avatar,
-            additionalGuests: dto.additionalGuests || []
+            additionalGuests: dto.additionalGuests || [],
+            totalPeople: totalPeople,
+            priceAtUsage: priceAtUsage,
+            totalAmount: totalAmount,
         };
     }
 }
