@@ -27,6 +27,10 @@ export default class ServiceUsageService {
                 "history.method",
                 "history.checkInTime",
                 "history.checkOutTime",
+                "history.phone",
+                "history.priceAtUsage",
+                "history.totalAmount",
+                "history.paymentStatus",
                 "resident.id",
                 "resident.fullName",
                 "resident.phone",
@@ -67,8 +71,10 @@ export default class ServiceUsageService {
         // 🔹 Map dữ liệu cho FE cũ
         const mappedItems = result.items.map(item => ({
             id: item.id,
-            quantity: 1 + (item.additionalGuests ? item.additionalGuests.split(',').filter(Boolean).length : 0),
+            quantity: (item.additionalGuests ? item.additionalGuests.split(',').filter(Boolean).length : 0),
             additionalGuests: item.additionalGuests,
+            price: item.priceAtUsage,
+            total: item.totalAmount,
             checkInOut: {
                 checkInTime: item.checkInTime,
                 checkOutTime: item.checkOutTime,
@@ -130,6 +136,8 @@ export default class ServiceUsageService {
                 totalGuests: total,
                 checkInTime: history.checkInTime,
                 checkOutTime: history.checkOutTime,
+                totalAmount:history.totalAmount,
+                priceAtUsage:history.priceAtUsage,
                 method: history.method,
                 phone: history.resident?.phone || history.phone,
             },
@@ -139,7 +147,6 @@ export default class ServiceUsageService {
             service: {
                 id: history.service?.id,
                 serviceName: history.service.serviceName || 'Dịch vụ không xác định',
-                price: history.service.price || 0,
                 capacity: history.service.capacity,
             },
             staff: history.staff ? {
