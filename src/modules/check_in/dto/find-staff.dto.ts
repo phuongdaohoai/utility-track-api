@@ -5,7 +5,7 @@ export class FindStaffDto {
                   
     @ApiProperty({ required: false })
     @IsOptional()
-    @IsString()
-    qrCode?: string;                       
+    @IsNumber()
+    id?: number;                       
 
 }
