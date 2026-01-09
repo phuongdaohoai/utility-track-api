@@ -18,7 +18,7 @@ export class JwtAuthService {
 
     generateToken(userLogin: any, role: string, permissions: string[]) {
         const payload: any = {
-            staffId: userLogin.staffId,
+            staffId: userLogin.id,
             email: userLogin.email,
             role: role,
             fullname: userLogin.fullName,
