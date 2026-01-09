@@ -15,7 +15,7 @@ import { FilterCheckinDto } from "./dto/filter-checkin.dto";
 import { PartialCheckoutDto } from "./dto/partial-check-out.dto";
 import { StaffAttendances } from "src/entities/staff-attendances.entity";
 import { FindStaffDto } from "./dto/find-staff.dto";
-import { StaffCheckInDto } from "./dto/staff-check-in.dto";
+import { StaffCheckInDto } from "./dto/staff-out.dto";
 import { Staffs } from "src/entities/staffs.entity";
 import { Action } from "rxjs/internal/scheduler/Action";
 @Injectable()
@@ -316,11 +316,10 @@ export class CheckInService {
     }
 
     async findStaff(dto: FindStaffDto): Promise<Staffs> {
-        console.log('2. Searching for Staff with QR Code:', `'${dto.qrCode}'`);
-        if (dto.qrCode) {
+        if (dto.id) {
             const staff = await this.staffRepo.findOne({
                 where: {
-                    qrCode: Like(`${dto.qrCode.trim()}`),
+                    id: dto.id,
                     status: 1
                 },
             });
@@ -443,20 +442,9 @@ export class CheckInService {
         };
     }
 
-    async staffCheckInOrOut(dto: StaffCheckInDto) {
-
-        const method = dto.qrCode ? ServiceUsageMethod.QR_CODE : ServiceUsageMethod.FACE_ID;
-        const methodKey = method === ServiceUsageMethod.QR_CODE ? 'QR' : 'FACEID';
-
-        // Validate config hệ thống (giữ nguyên)
-        await this.systemConfigService.validateAccess(methodKey);
-
-        if (!dto.qrCode) {
-            throw new BadRequestException(ERROR_CODE.STAFF_NOT_FOUND, 'Nhân viên không hợp lệ! Vui lòng thử lại.');
-        }
-
+    async staffCheckOut(dto: StaffCheckInDto) {
         const data: FindStaffDto = {
-            qrCode: dto.qrCode,
+            id: dto.id,
         }
 
         let now = new Date();
@@ -465,37 +453,22 @@ export class CheckInService {
         const staff = await this.findStaff(data);
         const activeAttendance = await this.staffAttendancesRepo.findOne({
             where: {
-                staff: { id: staff.id },
+                staff: staff,
+                checkOutTime: IsNull(),
             },
             order: { checkInTime: 'DESC' },
         });
-        if (activeAttendance && !activeAttendance.checkOutTime) {
-            // Đây là lần quét thứ 2 → CHECK-OUT
+        if (!activeAttendance) {
+            throw new BadRequestException('Bạn chưa Check-in hoặc đã Check-out rồi! Vui lòng đăng nhập lại.');
+        }
+        if (activeAttendance) {
             activeAttendance.checkOutTime = now;
             await this.staffAttendancesRepo.save(activeAttendance, { reload: false });
             action = 'checkout'
-        } else {
-            // Đây là lần quét đầu → CHECK-IN
-            const newAttendance = this.staffAttendancesRepo.create({
-                staff: { id: staff.id },
-                checkInTime: now,
-                checkOutTime: null,
-                deviceInfo: methodKey ? 'QR' : 'SYSTEM',
-            });
-            await this.staffAttendancesRepo.save(newAttendance, { reload: false });
-            action = 'checkin'
         }
         return {
-            status: 'SUCCESS',
             action: action,
-            data: {
-                id: staff.id,
-                full_name: staff.fullName,
-                avatar: staff.avatar,
-            }
-
-        };
-
+        }
     }
 }
 function parseGuests(guests?: string | null): string[] {
