@@ -58,6 +58,7 @@ import { ApartmentModule } from './modules/apartment/apartment.module';
     UploadModule,
     SystemConfigModule,
     ApartmentModule,
+    
   ],
 
   controllers: [AppController],

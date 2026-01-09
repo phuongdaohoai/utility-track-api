@@ -11,6 +11,7 @@ import { CheckInOuts } from "./check-in-outs.entity";
 import { ServiceUsageHistories } from "./service-usage-histories.entity";
 import { Roles } from "./roles.entity";
 import { BaseEntity } from "./base.entity";
+import { StaffAttendances } from "./staff-attendances.entity";
 
 @Index("PK__staffs__3213E83F28AE9AC2", ["id"], { unique: true })
 @Index("UQ__staffs__AB6E61644A687662", ["email"], { unique: true })
@@ -37,7 +38,11 @@ export class Staffs extends BaseEntity {
   @Column("int", { name: "status", nullable: true, default: () => "(1)" })
   status: number | null;
 
+  @Column("varchar", { name: "qr_code", nullable: true, length: 255 })
+  qrCode: string | null;
 
+  @OneToMany(() => StaffAttendances, (attendance) => attendance.staff)
+  attendances: StaffAttendances[];
 
   @OneToMany(() => CheckInOuts, (checkInOuts) => checkInOuts.staff)
   checkInOuts: CheckInOuts[];

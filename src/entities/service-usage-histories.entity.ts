@@ -26,6 +26,21 @@ export class ServiceUsageHistories extends BaseEntity {
   })
   usageTime: Date | null;
 
+  @Column("decimal", { name: "price_at_usage", precision: 18, scale: 2, default: 0 })
+  priceAtUsage: number;
+
+  @Column("decimal", { name: "total_amount", precision: 18, scale: 2, default: 0 })
+  totalAmount: number;
+
+  @Column("int", { name: "payment_status", default: 0 })
+  paymentStatus: number; // 0: Pending, 1: Paid, 2: Cancelled
+
+  @Column("nvarchar", { name: "payment_method", nullable: true, length: 50 })
+  paymentMethod: string | null;
+
+  @Column("varchar", { name: "invoice_ref", nullable: true, length: 50 })
+  invoiceRef: string | null;
+
   @Column("nvarchar", { name: "additional_guests", nullable: true })
   additionalGuests: string | null;
 
