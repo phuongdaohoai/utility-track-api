@@ -26,6 +26,12 @@ export class CheckInController {
     }
 
 
+    @Get('get-all-check-ins-staff')
+    async getCurrentCheckInsStaff(@Query() filter: FilterCheckinDto) {
+        const result = await this.checkInService.getCurrentCheckInsStaff(filter);
+        return ApiResponse.ok(result);
+    }
+
     @Post('current-check-outs/:checkinId')
     @ApiBody({
         schema: {
