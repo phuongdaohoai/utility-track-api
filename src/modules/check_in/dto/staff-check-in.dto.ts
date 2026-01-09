@@ -1,16 +1,17 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsArray, IsNumber } from 'class-validator';
+import { IsInt, IsOptional, IsString, IsArray, IsNumber } from 'class-validator';
 
-export class FindResidentDto {
-                  
+export class StaffCheckInDto {
+   
     @ApiProperty({ required: false })
     @IsOptional()
     @IsString()
-    qrCode?: string;                       
+    qrCode?: string;
 
     @ApiProperty({ required: false, type: [Number] })
     @IsOptional()
     @IsArray()
     @IsNumber({}, { each: true })
-    faceDescriptor?: number[]; 
+    faceDescriptor?: number[];
+    
 }

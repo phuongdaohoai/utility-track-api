@@ -13,6 +13,8 @@ import { FindResidentDto } from "./dto/find-resident.dto";
 import { QueryHelper } from "src/common/helper/query.helper";
 import { FilterCheckinDto } from "./dto/filter-checkin.dto";
 import { PartialCheckoutDto } from "./dto/partial-check-out.dto";
+import { FindStaffDto } from "./dto/find-staff.dto";
+import { StaffCheckInDto } from "./dto/staff-check-in.dto";
 @Injectable()
 export class CheckInService {
     constructor(

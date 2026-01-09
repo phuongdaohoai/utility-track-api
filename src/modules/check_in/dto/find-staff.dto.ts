@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsString, IsArray, IsNumber } from 'class-validator';
 
-export class FindResidentDto {
+export class FindStaffDto {
                   
     @ApiProperty({ required: false })
     @IsOptional()
