@@ -22,26 +22,52 @@ export class AuthService {
 
     ) { }
     async login(body: LoginDto) {
-        const { email, password } = body;
+        const { email, password, qrCode } = body;
 
-        // 1. Tìm user
-        const user = await this.findUserByEmail(email);
-        if (!user) {
+        let user: Staffs | null = null;
+        if (qrCode) {
+            user = await this.verifyQrCode(qrCode);
+        } else if (email && password) {
+            // 1. Tìm user
+            user = await this.findUserByEmail(email);
+            if (!user) {
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.AUTH_INVALID_CREDENTIALS,
+                    message: "Sai tài khoản hoặc mật khẩu",
+                });
+            }
+
+            // 2. Verify password
+            const match = await PasswordHelper.verifyPassword(password, user.passwordHash);
+            if (!match) {
+                throw new BadRequestException({
+                    errorCode: ERROR_CODE.AUTH_INVALID_PASSWORD,
+                    message: "Sai mật khẩu",
+                });
+            }
+
+        } else {
+            throw new BadRequestException({ errorCode: ERROR_CODE.AUTH_INVALID_CREDENTIALS, message: "Sai tài khoản hoặc mật khẩu" })
+        }
+        return this.handleUserLogin(user);
+
+    }
+    private async verifyQrCode(qrCode: string) {
+        const staff = await this.repoStaff.findOne({
+            where: { qrCode: qrCode },
+            relations: {
+                role: true,
+            }
+        });
+        if (!staff) {
             throw new BadRequestException({
-                errorCode: ERROR_CODE.AUTH_INVALID_CREDENTIALS,
-                message: "Sai tài khoản hoặc mật khẩu",
+                errorCode: ERROR_CODE.STAFF_NOT_FOUND,
+                message: "Không tìm thấy nhân viên",
             });
         }
-
-        // 2. Verify password
-        const match = await PasswordHelper.verifyPassword(password, user.passwordHash);
-        if (!match) {
-            throw new BadRequestException({
-                errorCode: ERROR_CODE.AUTH_INVALID_PASSWORD,
-                message: "Sai mật khẩu",
-            });
-        }
-
+        return staff
+    }
+    private async handleUserLogin(user: Staffs) {
         // 3. Check role
         const roleId = user.role.id ?? 0;
         if (roleId === 0) {
