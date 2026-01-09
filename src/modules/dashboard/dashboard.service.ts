@@ -95,8 +95,7 @@ export class DashboardService {
     private async getRevenueStats() {
         const result = await this.serviceUsageRepo
             .createQueryBuilder('suh')
-            .leftJoin('suh.service', 'service')
-            .select('COALESCE(SUM(service.price), 0)', 'TotalRevenueToday')
+            .select('COALESCE(SUM(suh.total_amount), 0)', 'TotalRevenueToday')
             .where(`
             suh.check_in_time AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time'
             >= CAST(GETUTCDATE() AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time' AS DATE)
