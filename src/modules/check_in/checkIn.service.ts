@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { CreateCheckInDto } from "./dto/create-checkin.dto";
-import { IsNull, Repository } from "typeorm";
+import { IsNull, Repository, Like } from "typeorm";
 import { Residents } from "src/entities/residents.entity";
 import { ERROR_CODE } from "src/common/constants/error-code.constant";
 import { ResidentCheckInDto } from "./dto/resident-check-in.dto";
@@ -14,6 +14,10 @@ import { QueryHelper } from "src/common/helper/query.helper";
 import { FilterCheckinDto } from "./dto/filter-checkin.dto";
 import { PartialCheckoutDto } from "./dto/partial-check-out.dto";
 import { StaffAttendances } from "src/entities/staff-attendances.entity";
+import { FindStaffDto } from "./dto/find-staff.dto";
+import { StaffCheckInDto } from "./dto/staff-check-in.dto";
+import { Staffs } from "src/entities/staffs.entity";
+import { Action } from "rxjs/internal/scheduler/Action";
 @Injectable()
 export class CheckInService {
     constructor(
@@ -30,6 +34,8 @@ export class CheckInService {
         @InjectRepository(StaffAttendances)
         private staffAttendancesRepo: Repository<StaffAttendances>,
 
+        @InjectRepository(Staffs)
+        private staffRepo: Repository<Staffs>,
 
         private readonly systemConfigService: SystemService,
     ) { }
@@ -170,7 +176,6 @@ export class CheckInService {
         return await this.serviceUsageRepo.save(usage);
     }
 
-
     async createCheckIn(data: CreateCheckInDto, staffId: number) {
 
         await this.systemConfigService.validateAccess('MANUAL');
@@ -285,6 +290,7 @@ export class CheckInService {
             apartment: null
         };
     }
+
     async findResident(dto: FindResidentDto): Promise<Residents> {
         if (dto.qrCode) {
             const resident = await this.residentRepo.findOne({
@@ -307,6 +313,20 @@ export class CheckInService {
         }
 
         throw new BadRequestException(ERROR_CODE.CHECKIN_INVALID_RESIDENT, 'Cư dân không hợp lệ! Vui lòng thử lại.');
+    }
+
+    async findStaff(dto: FindStaffDto): Promise<Staffs> {
+        console.log('2. Searching for Staff with QR Code:', `'${dto.qrCode}'`);
+        if (dto.qrCode) {
+            const staff = await this.staffRepo.findOne({
+                where: {
+                    qrCode: Like(`${dto.qrCode.trim()}`),
+                    status: 1
+                },
+            });
+            if (staff) return staff;
+        }
+        throw new BadRequestException(ERROR_CODE.STAFF_NOT_FOUND, 'Nhân viên không hợp lệ! Vui lòng thử lại.');
     }
 
     async partialCheckout(checkinId: number, dto: PartialCheckoutDto) {
@@ -333,9 +353,11 @@ export class CheckInService {
 
         return usage;
     }
+
     private euclideanDistance(a: number[], b: number[]): number {
         return Math.sqrt(a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0));
     }
+
     async residentCheckInOrOut(dto: ResidentCheckInDto) {
         const method = dto.qrCode ? ServiceUsageMethod.QR_CODE : ServiceUsageMethod.FACE_ID;
         const methodKey = method === ServiceUsageMethod.QR_CODE ? 'QR' : 'FACEID';
@@ -419,6 +441,61 @@ export class CheckInService {
             priceAtUsage: priceAtUsage,
             totalAmount: totalAmount,
         };
+    }
+
+    async staffCheckInOrOut(dto: StaffCheckInDto) {
+
+        const method = dto.qrCode ? ServiceUsageMethod.QR_CODE : ServiceUsageMethod.FACE_ID;
+        const methodKey = method === ServiceUsageMethod.QR_CODE ? 'QR' : 'FACEID';
+
+        // Validate config hệ thống (giữ nguyên)
+        await this.systemConfigService.validateAccess(methodKey);
+
+        if (!dto.qrCode) {
+            throw new BadRequestException(ERROR_CODE.STAFF_NOT_FOUND, 'Nhân viên không hợp lệ! Vui lòng thử lại.');
+        }
+
+        const data: FindStaffDto = {
+            qrCode: dto.qrCode,
+        }
+
+        let now = new Date();
+        let action = '';
+
+        const staff = await this.findStaff(data);
+        const activeAttendance = await this.staffAttendancesRepo.findOne({
+            where: {
+                staff: { id: staff.id },
+            },
+            order: { checkInTime: 'DESC' },
+        });
+        if (activeAttendance && !activeAttendance.checkOutTime) {
+            // Đây là lần quét thứ 2 → CHECK-OUT
+            activeAttendance.checkOutTime = now;
+            await this.staffAttendancesRepo.save(activeAttendance, { reload: false });
+            action = 'checkout'
+        } else {
+            // Đây là lần quét đầu → CHECK-IN
+            const newAttendance = this.staffAttendancesRepo.create({
+                staff: { id: staff.id },
+                checkInTime: now,
+                checkOutTime: null,
+                deviceInfo: methodKey ? 'QR' : 'SYSTEM',
+            });
+            await this.staffAttendancesRepo.save(newAttendance, { reload: false });
+            action = 'checkin'
+        }
+        return {
+            status: 'SUCCESS',
+            action: action,
+            data: {
+                id: staff.id,
+                full_name: staff.fullName,
+                avatar: staff.avatar,
+            }
+
+        };
+
     }
 }
 function parseGuests(guests?: string | null): string[] {

@@ -4,9 +4,11 @@ import { CreateCheckInDto } from './dto/create-checkin.dto';
 import { ApiResponse } from "../../common/response.dto";
 import { ResidentCheckInDto } from './dto/resident-check-in.dto';
 import { FindResidentDto } from './dto/find-resident.dto';
-import { ApiBody, ApiProperty } from '@nestjs/swagger';
+import { ApiBody } from '@nestjs/swagger';
 import { FilterCheckinDto } from './dto/filter-checkin.dto';
 import { PartialCheckoutDto } from './dto/partial-check-out.dto';
+import { StaffCheckInDto } from './dto/staff-check-in.dto';
+import { FindStaffDto } from './dto/find-staff.dto';
 
 
 @Controller('check-in')
@@ -77,6 +79,18 @@ export class CheckInController {
     @Post('find-resident')
     async findResident(@Body() dto: FindResidentDto) {
         const result = await this.checkInService.findResident(dto);
+        return ApiResponse.ok(result);
+    }
+
+    @Post('staff-check-in')
+    async staffCheckIn(@Body() dto: StaffCheckInDto) {
+        const result = await this.checkInService.staffCheckInOrOut(dto);
+        return ApiResponse.ok(result);
+    }
+
+    @Post('find-staff')
+    async findStaff(@Body() dto: FindStaffDto) {
+        const result = await this.checkInService.findStaff(dto);
         return ApiResponse.ok(result);
     }
 }
