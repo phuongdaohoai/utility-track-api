@@ -13,8 +13,9 @@ import { ERROR_CODE } from 'src/common/constants/error-code.constant';
 import { error } from 'console';
 import { QueryHelper } from 'src/common/helper/query.helper';
 import { ImportStaffItemDto } from './dto/import-staff.dto';
-import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { Roles } from 'src/entities/roles.entity';
+import { errorContext } from 'rxjs/internal/util/errorContext';
 
 @Injectable()
 export class StaffService {
@@ -55,6 +56,7 @@ export class StaffService {
                 phone: true,
                 avatar: true,
                 status: true,
+                qrCode: true,
                 version: true,
                 createdAt: true,
                 updatedAt: true,
@@ -72,6 +74,26 @@ export class StaffService {
         return staff;
     }
 
+    async resetQrCode(id: number): Promise<Staffs> {
+        const newQrToken = crypto.randomBytes(32).toString('hex');
+        const result = await this.repo.update(id, { qrCode: newQrToken });
+
+        if (result.affected === 0) throw new NotFoundException({
+            errorCode: ERROR_CODE.STAFF_NOT_FOUND,
+            message: "Không tìm thấy nhân viên",
+        });
+
+        const staff = await this.repo.findOne({
+            where: { id: id },
+        });
+
+        if (!staff) throw new NotFoundException({
+            errorCode: ERROR_CODE.STAFF_NOT_FOUND,
+            message: "Không tìm thấy nhân viên"
+        });
+
+        return staff;
+    }
     async findById(id: number) {
         const staff = await this.findOne(id);
         console.log(staff);

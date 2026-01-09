@@ -29,7 +29,7 @@ export class StaffController {
     async create(
         @Body() dto: CreateStaffDto,
         @Req() req) {
-        const result= await this.service.create(dto, req.user.staffId);
+        const result = await this.service.create(dto, req.user.staffId);
         return ApiResponse.ok(result, "Thêm nhân viên thành công");
     }
 
@@ -38,18 +38,26 @@ export class StaffController {
     async getById(
         @Param('staffId') staffId: number,
         @Req() req) {
-        const result= await this.service.findById(+staffId);
+        const result = await this.service.findById(+staffId);
         return ApiResponse.ok(result);
     }
 
+    @Put('reset-qr-code/:staffId')
+    @Permissions('Staff.Update')
+    async resetQrCode(
+        @Param('staffId') staffId: number,
+    ) {
+        const result = await this.service.resetQrCode(+staffId);
+        return ApiResponse.ok(result, "Cập nhật mã QR thành công");
+    }
     @Put('update/:staffId')
     @Permissions('Staff.Update')
     async update(
         @Param('staffId') staffId: number,
         @Body() dto: UpdateStaffDto,
         @Req() req) {
-        const result=await this.service.update(+staffId, dto, req.user.staffId);
-        return ApiResponse.ok(result,"Cập nhật nhân viên thành công");
+        const result = await this.service.update(+staffId, dto, req.user.staffId);
+        return ApiResponse.ok(result, "Cập nhật nhân viên thành công");
     }
 
     @Delete('delete/:staffId')
@@ -57,8 +65,8 @@ export class StaffController {
     async delete(
         @Param('staffId') staffId: number,
         @Req() req) {
-        const result=await this.service.remove(+staffId, req.user.staffId);
-        return ApiResponse.ok(result,"Xóa nhân viên thành công");
+        const result = await this.service.remove(+staffId, req.user.staffId);
+        return ApiResponse.ok(result, "Xóa nhân viên thành công");
     }
 
     @Post('import')
