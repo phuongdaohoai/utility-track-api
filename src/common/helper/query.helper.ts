@@ -27,15 +27,15 @@ export class QueryHelper {
     ): Promise<PaginationResult<T>> {
         const page = Number(filter.page) || 1;
         const pageSize = Number(filter.pageSize) || 10;
-        
+
         // Giá trị mặc định
-        const { 
-            alias, 
-            searchFields = [], 
-            fieldMap = {}, 
+        const {
+            alias,
+            searchFields = [],
+            fieldMap = {},
             dateFields = [],
             // Mặc định dùng Collation của SQL Server như code cũ của bạn
-            collation = 'SQL_Latin1_General_CP1253_CI_AI' 
+            collation = 'SQL_Latin1_General_CP1253_CI_AI'
         } = config;
 
         // --- 1. XỬ LÝ SEARCH CHUNG (Ô tìm kiếm) ---
@@ -60,15 +60,19 @@ export class QueryHelper {
                     filters.forEach((f, index) => {
                         // Map field: Nếu có trong map thì dùng, không thì mặc định alias.field
                         let dbField = fieldMap[f.field] || `${alias}.${f.field}`;
-                        
+
                         // Tạo tên tham số ngẫu nhiên để tránh trùng lặp
                         const pName = `q_val_${index}_${Math.floor(Math.random() * 10000)}`;
-                        
+
                         // Kiểm tra xem field hiện tại có phải là Date không (dựa vào config truyền vào)
                         const isDate = dateFields.includes(f.field);
 
                         // Bỏ qua nếu giá trị undefined (trừ check null)
-                        if (f.value === undefined && f.operator !== 'is' && f.operator !== 'is_not') return;
+                        if (
+                            f.value === undefined &&
+                            !['is', 'is_not', 'range'].includes(f.operator)
+                        ) return;
+
 
                         switch (f.operator) {
                             case 'is':
@@ -76,7 +80,7 @@ export class QueryHelper {
                                     qb.andWhere(`${dbField} IS NULL`);
                                 } else if (isDate) {
                                     // 🔥 LOGIC GIỮ LẠI: Tìm ngày trong khoảng 00:00:00 -> 23:59:59
-                                    const dateStr = f.value; 
+                                    const dateStr = f.value;
                                     qb.andWhere(`${dbField} >= :${pName}_start AND ${dbField} <= :${pName}_end`, {
                                         [`${pName}_start`]: `${dateStr} 00:00:00`,
                                         [`${pName}_end`]: `${dateStr} 23:59:59`
@@ -88,8 +92,24 @@ export class QueryHelper {
                                 break;
 
                             case 'is_not':
-                                qb.andWhere(`${dbField} != :${pName}`, { [pName]: f.value });
+                                if (isDate) {
+                                    const start = new Date(`${f.value}T00:00:00`);
+                                    const end = new Date(`${f.value}T23:59:59`);
+
+                                    qb.andWhere(
+                                        new Brackets(wb => {
+                                            wb.where(`${dbField} < :${pName}_start`, {
+                                                [`${pName}_start`]: start,
+                                            }).orWhere(`${dbField} > :${pName}_end`, {
+                                                [`${pName}_end`]: end,
+                                            });
+                                        })
+                                    );
+                                } else {
+                                    qb.andWhere(`${dbField} != :${pName}`, { [pName]: f.value });
+                                }
                                 break;
+
 
                             case 'contains':
                                 if (Array.isArray(f.value)) {
@@ -126,17 +146,30 @@ export class QueryHelper {
 
                             case 'range':
                                 if (f.from && f.to) {
-                                    let toVal = f.to;
-                                    // Tự động thêm giờ cuối ngày nếu là Date
-                                    if (isDate && !toVal.includes(':')) {
-                                        toVal = `${f.to} 23:59:59`;
+                                    if (isDate) {
+                                        const fromDate = new Date(`${f.from}T00:00:00`);
+                                        const toDate = new Date(`${f.to}T23:59:59`);
+
+                                        qb.andWhere(
+                                            `${dbField} BETWEEN :${pName}_from AND :${pName}_to`,
+                                            {
+                                                [`${pName}_from`]: fromDate,
+                                                [`${pName}_to`]: toDate,
+                                            }
+                                        );
+                                    } else {
+                                        qb.andWhere(
+                                            `${dbField} BETWEEN :${pName}_from AND :${pName}_to`,
+                                            {
+                                                [`${pName}_from`]: f.from,
+                                                [`${pName}_to`]: f.to,
+                                            }
+                                        );
                                     }
-                                    qb.andWhere(`${dbField} BETWEEN :${pName}_from AND :${pName}_to`, {
-                                        [`${pName}_from`]: f.from,
-                                        [`${pName}_to`]: toVal
-                                    });
                                 }
                                 break;
+
+
                         }
                     });
                 }
@@ -154,6 +187,8 @@ export class QueryHelper {
                 .take(pageSize)
                 .orderBy(`${alias}.id`, 'DESC') // Mặc định sắp xếp giảm dần theo ID
                 .getMany();
+            console.log(qb.getSql());
+            console.log(qb.getParameters());
 
             return {
                 totalItem,
