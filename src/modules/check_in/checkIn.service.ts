@@ -328,30 +328,37 @@ export class CheckInService {
         throw new BadRequestException(ERROR_CODE.STAFF_NOT_FOUND, 'Nhân viên không hợp lệ! Vui lòng thử lại.');
     }
 
-    async partialCheckout(checkinId: number, dto: PartialCheckoutDto) {
-        if (!dto.guestsToCheckout || dto.guestsToCheckout.length === 0) {
-            throw new BadRequestException(ERROR_CODE.CHECKIN_INVALID_GUESTS, 'Chưa chọn người cần checkout');
-        }
-
-        const usage = await this.serviceUsageRepo.findOne({
-            where: { id: checkinId, checkOutTime: IsNull() },
-            relations: ['resident'],
-        })
-
-        if (!usage) {
-            throw new NotFoundException(ERROR_CODE.CHECKIN_NOT_FOUND, "Không tìm thấy thông tin check-in")
-        }
-
-        const guests = parseGuests(usage.additionalGuests);
-
-        const remainingGuests = guests.filter(g => !dto.guestsToCheckout.includes(g));
-
-        usage.additionalGuests = remainingGuests.length ? remainingGuests.join(',') : null;
-
-        await this.serviceUsageRepo.save(usage);
-
-        return usage;
+ async partialCheckout(checkinId: number, dto: PartialCheckoutDto) {
+    if (!dto.guestsToCheckout || dto.guestsToCheckout.length === 0) {
+        throw new BadRequestException(ERROR_CODE.CHECKIN_INVALID_GUESTS, 'Chưa chọn người cần checkout');
     }
+
+    const usage = await this.serviceUsageRepo.findOne({
+        where: { id: checkinId, checkOutTime: IsNull() },
+        relations: ['resident'],
+    });
+
+    if (!usage) {
+        throw new NotFoundException(ERROR_CODE.CHECKIN_NOT_FOUND, "Không tìm thấy thông tin check-in");
+    }
+
+    const currentGuests = parseGuests(usage.additionalGuests);
+    
+    const sortedIndices = dto.guestsToCheckout.sort((a, b) => b - a);
+
+    for (const index of sortedIndices) {
+        if (index >= 0 && index < currentGuests.length) {
+            currentGuests.splice(index, 1);
+        }
+    }
+
+    usage.additionalGuests = currentGuests.length ? currentGuests.join(',') : null;
+
+    await this.serviceUsageRepo.save(usage);
+
+    return usage;
+}
+
 
     private euclideanDistance(a: number[], b: number[]): number {
         return Math.sqrt(a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0));

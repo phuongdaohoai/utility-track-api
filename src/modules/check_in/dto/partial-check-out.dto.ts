@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsArray, IsNotEmpty, IsNumber, IsString } from "class-validator";
+import { IsArray, IsNotEmpty, IsNumber, IsString, Min } from "class-validator";
 
 export class PartialCheckoutDto{
     // @ApiProperty({
@@ -11,12 +11,13 @@ export class PartialCheckoutDto{
     // checkinId: number;
 
     @ApiProperty({
-        description: 'Danh sách khách bổ sung sẽ được check-out',
-        type: [String],
-        example: ['Khách 1', 'Khách 2']
+       description: 'Danh sách vị trí (index) của khách bổ sung cần check-out (trong mảng additionalGuests)',
+        type: [Number],
+        example: [0, 2]
     })
-    @IsArray({ message: 'Danh sách khách check-out phải là một mảng' })
-    @IsString({ each: true, message: 'Tên khách phải là chuỗi' })
-    guestsToCheckout: string[];
+   @IsArray({ message: 'Danh sách vị trí phải là một mảng' })
+    @IsNumber({}, { each: true, message: 'Vị trí (index) phải là số' })
+    @Min(0, { each: true, message: 'Vị trí (index) không được nhỏ hơn 0' })
+    guestsToCheckout: number[];
 
 }
