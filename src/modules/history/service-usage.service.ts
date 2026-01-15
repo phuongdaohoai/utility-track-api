@@ -69,21 +69,24 @@ export default class ServiceUsageService {
 
         })
         // 🔹 Map dữ liệu cho FE cũ
-        const mappedItems = result.items.map(item => ({
-            id: item.id,
-            quantity: (item.additionalGuests ? item.additionalGuests.split(',').filter(Boolean).length : 0),
-            additionalGuests: item.additionalGuests,
-            price: item.priceAtUsage,
-            total: item.totalAmount,
-            checkInOut: {
-                checkInTime: item.checkInTime,
-                checkOutTime: item.checkOutTime,
-                method: item.method,
-            },
-            resident: item.resident ? { fullName: item.resident.fullName, phone: item.resident.phone } : undefined,
-            service: item.service,
-            staff: item.staff,
-        }));
+        const mappedItems = result.items.map(item => {
+            const allGuests = parseGuests(item.additionalGuests, false); // Lấy tất cả guests để tính lịch sử gốc
+            return {
+                id: item.id,
+                quantity: allGuests.length,
+                additionalGuests: allGuests.map(g => g.name).join(', '), // Return comma-separated string để FE render dễ, giữ lịch sử gốc
+                price: item.priceAtUsage,
+                total: item.totalAmount,
+                checkInOut: {
+                    checkInTime: item.checkInTime,
+                    checkOutTime: item.checkOutTime,
+                    method: item.method,
+                },
+                resident: item.resident ? { fullName: item.resident.fullName, phone: item.resident.phone } : undefined,
+                service: item.service,
+                staff: item.staff,
+            };
+        });
         const totalPages = Math.ceil(result.totalItem / result.pageSize);
 
         return {
@@ -112,18 +115,19 @@ export default class ServiceUsageService {
         if (!history) {
             throw new NotFoundException(ERROR_CODE.HISTORY_NOT_FOUND)
         }
-        const guests = parseGuests(history.additionalGuests)
+        const allGuests = parseGuests(history.additionalGuests, false); // Lấy tất cả guests để tính lịch sử
+        const activeGuests = allGuests.filter(g => g.checkedOutAt === null);
         let displayName = ''
         let total = 0
         let remainingNames = ''
         if (history.resident) {
             displayName = history.resident.fullName
-            remainingNames = guests.join(', ');
-            total = 1 + guests.length
+            remainingNames = allGuests.map(g => g.name).join(', '); // Sử dụng allGuests để giữ lịch sử gốc
+            total = 1 + allGuests.length
         } else {
-            displayName = guests.length > 0 ? guests[0] : 'Khách vãng lai'
-            remainingNames = guests.slice(1).join(', ');
-            total = guests.length > 0 ? guests.length : 1
+            displayName = allGuests.length > 0 ? allGuests[0].name : 'Khách vãng lai'
+            remainingNames = allGuests.slice(1).map(g => g.name).join(', ');
+            total = allGuests.length > 0 ? allGuests.length : 1
         }
         return {
             id: history.id,
@@ -136,8 +140,8 @@ export default class ServiceUsageService {
                 totalGuests: total,
                 checkInTime: history.checkInTime,
                 checkOutTime: history.checkOutTime,
-                totalAmount:history.totalAmount,
-                priceAtUsage:history.priceAtUsage,
+                totalAmount: history.totalAmount,
+                priceAtUsage: history.priceAtUsage,
                 method: history.method,
                 phone: history.resident?.phone || history.phone,
             },
@@ -154,14 +158,22 @@ export default class ServiceUsageService {
                 fullName: history.staff.fullName,
             } : null
         };
+    }
+}
 
-
-        function parseGuests(guests?: string | null): string[] {
-            if (!guests) return [];
-            return guests
-                .split(',')
-                .map(g => g.trim())
-                .filter(Boolean);
+// Hàm parse cập nhật: Parse JSON, hỗ trợ onlyActive và fallback data cũ
+function parseGuests(guests?: string | null, onlyActive: boolean = true): { name: string, checkedOutAt: Date | null }[] {
+    if (!guests) return [];
+    try {
+        const parsed = JSON.parse(guests);
+        if (!Array.isArray(parsed)) return [];
+        if (onlyActive) {
+            return parsed.filter(g => g.checkedOutAt === null);
         }
+        return parsed;
+    } catch (e) {
+        // Fallback cho data cũ (comma-separated): Convert sang JSON format
+        const oldGuests = guests.split(',').map(g => g.trim()).filter(Boolean);
+        return oldGuests.map(name => ({ name, checkedOutAt: null }));
     }
 }

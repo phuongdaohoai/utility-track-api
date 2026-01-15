@@ -18,10 +18,10 @@ import { FindStaffDto } from "./dto/find-staff.dto";
 import { StaffCheckInDto } from "./dto/staff-out.dto";
 import { Staffs } from "src/entities/staffs.entity";
 import { Action } from "rxjs/internal/scheduler/Action";
+
 @Injectable()
 export class CheckInService {
     constructor(
-
         @InjectRepository(ServiceUsageHistories)
         private serviceUsageRepo: Repository<ServiceUsageHistories>,
 
@@ -41,7 +41,6 @@ export class CheckInService {
     ) { }
 
     async getCurrentCheckIns(filter: FilterCheckinDto) {
-
         const qb = this.serviceUsageRepo
             .createQueryBuilder('serviceUsageHistories')
             .leftJoinAndSelect('serviceUsageHistories.resident', 'resident')
@@ -56,7 +55,6 @@ export class CheckInService {
         if (filter.type === 'guest') {
             qb.andWhere('serviceUsageHistories.resident IS NULL');
         }
-
 
         const result = await QueryHelper.apply(qb, filter, {
             alias: 'serviceUsageHistories',
@@ -75,20 +73,20 @@ export class CheckInService {
             page: result.page,
             pageSize: result.pageSize,
             items: result.items.map(u => {
-                const guests = parseGuests(u.additionalGuests);
+                const activeGuests = parseGuests(u.additionalGuests); // Chỉ active (chưa out)
                 const hasResident = !!u.resident;
 
                 return {
                     id: u.id,
                     displayName: hasResident
                         ? u.resident.fullName
-                        : guests[0] ?? 'Khách',
+                        : (activeGuests[0]?.name ?? 'Khách'),
                     room: hasResident && u.resident.apartment
                         ? `${u.resident.apartment.building} - ${u.resident.apartment.roomNumber}`
                         : '-',
                     phone: u.phone,
-                    totalPeople: guests.length + (hasResident ? 1 : 0),
-                    additionalGuests: hasResident ? guests : guests.slice(1),
+                    totalPeople: activeGuests.length + (hasResident ? 1 : 0),
+                    additionalGuests: hasResident ? activeGuests.map(g => g.name) : activeGuests.slice(1).map(g => g.name),
                     serviceName: u.service.serviceName,
                     checkInTime: u.checkInTime,
                     method: u.method,
@@ -135,31 +133,28 @@ export class CheckInService {
             .leftJoinAndSelect('serviceUsageHistories.service', 'service')
             .where('serviceUsageHistories.checkOutTime IS NULL')
             .orderBy('serviceUsageHistories.checkInTime', 'DESC')
-            .getMany();;
-
+            .getMany();
 
         return items.map(u => {
-            const guests = parseGuests(u.additionalGuests);
+            const activeGuests = parseGuests(u.additionalGuests); // Chỉ active
             const hasResident = !!u.resident;
 
             return {
                 id: u.id,
                 displayName: hasResident
                     ? u.resident.fullName
-                    : guests[0] ?? 'Khách',
+                    : (activeGuests[0]?.name ?? 'Khách'),
                 room: hasResident && u.resident.apartment
                     ? `${u.resident.apartment.building} - ${u.resident.apartment.roomNumber}`
                     : '-',
                 phone: u.phone,
-
-                totalPeople: guests.length + (hasResident ? 1 : 0),
-                additionalGuests: hasResident ? guests : guests.slice(1),
+                totalPeople: activeGuests.length + (hasResident ? 1 : 0),
+                additionalGuests: hasResident ? activeGuests.map(g => g.name) : activeGuests.slice(1).map(g => g.name),
                 serviceName: u.service.serviceName,
                 checkInTime: u.checkInTime,
                 method: u.method,
             };
-        })
-
+        });
     }
 
     async currentCheckOuts(checkinId: number) {
@@ -177,7 +172,6 @@ export class CheckInService {
     }
 
     async createCheckIn(data: CreateCheckInDto, staffId: number) {
-
         await this.systemConfigService.validateAccess('MANUAL');
 
         const allowGuest = await this.systemConfigService.getConfigValue('GUEST_CHECKIN');
@@ -219,16 +213,17 @@ export class CheckInService {
 
             const savedOut = await this.serviceUsageRepo.save(existingSession);
 
+            // Parse để hiển thị (dùng all guests vì đã out)
+            const allGuests = parseGuests(savedOut.additionalGuests, false);
 
             return {
                 checkinId: savedOut.id,
                 status: 'CHECK_OUT',
-                message: `Đã Check-out cho khách: ${savedOut.additionalGuests}`,
+                message: `Đã Check-out cho khách: ${allGuests.map(g => g.name).join(', ')}`,
                 checkInTime: savedOut.checkInTime,
                 checkOutTime: savedOut.checkOutTime,
-
                 serviceName: serviceNameDisplay,
-                representative: savedOut.additionalGuests,
+                representative: allGuests[0]?.name ?? '',
                 phoneNumber: savedOut.phone,
                 type: 'GUEST'
             };
@@ -241,8 +236,7 @@ export class CheckInService {
         const totalPeople = guestNameArr.length;
         const totalAmount = priceAtUsage * totalPeople;
 
-        const additionalGuestsArr = guestNameArr?.length > 1 ? guestNameArr.slice(1) : [];
-
+        const additionalGuestsArr = guestNameArr.length > 1 ? guestNameArr.slice(1) : [];
 
         const newCheckIn = new ServiceUsageHistories();
 
@@ -251,13 +245,13 @@ export class CheckInService {
         newCheckIn.method = ServiceUsageMethod.MANUAL;
         newCheckIn.checkInTime = new Date();
         newCheckIn.phone = guestPhone;
-        newCheckIn.additionalGuests = guestNameArr.join(",");
+        // Lưu dưới dạng JSON để giữ lịch sử
+        newCheckIn.additionalGuests = JSON.stringify(guestNameArr.map(name => ({ name, checkedOutAt: null })));
 
         // Info khách
         newCheckIn.priceAtUsage = priceAtUsage;
         newCheckIn.totalAmount = totalAmount;
         newCheckIn.paymentStatus = 1;
-
 
         const savedIn = await this.serviceUsageRepo.save(newCheckIn);
 
@@ -277,15 +271,12 @@ export class CheckInService {
             checkOutTime: null,
             priceAtUsage,
             totalAmount,
-
             serviceName: serviceNameDisplay,
             representative: guestNameArr[0],
             phoneNumber: guestPhone,
-
             additionalGuests: additionalGuestsArr,
             totalPeople: totalPeople,
             members,
-
             type: 'GUEST',
             apartment: null
         };
@@ -328,37 +319,59 @@ export class CheckInService {
         throw new BadRequestException(ERROR_CODE.STAFF_NOT_FOUND, 'Nhân viên không hợp lệ! Vui lòng thử lại.');
     }
 
- async partialCheckout(checkinId: number, dto: PartialCheckoutDto) {
-    if (!dto.guestsToCheckout || dto.guestsToCheckout.length === 0) {
-        throw new BadRequestException(ERROR_CODE.CHECKIN_INVALID_GUESTS, 'Chưa chọn người cần checkout');
-    }
-
-    const usage = await this.serviceUsageRepo.findOne({
-        where: { id: checkinId, checkOutTime: IsNull() },
-        relations: ['resident'],
-    });
-
-    if (!usage) {
-        throw new NotFoundException(ERROR_CODE.CHECKIN_NOT_FOUND, "Không tìm thấy thông tin check-in");
-    }
-
-    const currentGuests = parseGuests(usage.additionalGuests);
-    
-    const sortedIndices = dto.guestsToCheckout.sort((a, b) => b - a);
-
-    for (const index of sortedIndices) {
-        if (index >= 0 && index < currentGuests.length) {
-            currentGuests.splice(index, 1);
+    async partialCheckout(checkinId: number, dto: PartialCheckoutDto) {
+        if (!dto.guestsToCheckout || dto.guestsToCheckout.length === 0) {
+            throw new BadRequestException(ERROR_CODE.CHECKIN_INVALID_GUESTS, 'Chưa chọn người cần checkout');
         }
+
+        const usage = await this.serviceUsageRepo.findOne({
+            where: { id: checkinId, checkOutTime: IsNull() },
+            relations: ['resident'],
+        });
+
+        if (!usage) {
+            throw new NotFoundException(ERROR_CODE.CHECKIN_NOT_FOUND, "Không tìm thấy thông tin check-in");
+        }
+
+        // Parse tất cả guests (bao gồm đã out)
+        let allGuests = parseGuests(usage.additionalGuests, false);
+
+        // Giả sử dto.guestsToCheckout là array index dựa trên active guests hiện tại
+        const activeGuests = allGuests.filter(g => g.checkedOutAt === null);
+        const sortedIndices = dto.guestsToCheckout.sort((a, b) => b - a);
+
+        for (const index of sortedIndices) {
+            if (index >= 0 && index < activeGuests.length) {
+                // Tìm và set checkedOutAt
+                const guestToOut = activeGuests[index];
+                const fullIndex = allGuests.findIndex(g => g.name === guestToOut.name && g.checkedOutAt === null);
+                if (fullIndex !== -1) {
+                    allGuests[fullIndex].checkedOutAt = new Date();
+                }
+            }
+        }
+
+        // Lưu lại JSON (giữ nguyên tất cả guests, chỉ update checkedOutAt)
+        usage.additionalGuests = JSON.stringify(allGuests);
+
+        // Nếu tất cả guests đã out (và không có resident), thì set checkOutTime cho toàn bộ record
+        const remainingActive = allGuests.filter(g => g.checkedOutAt === null).length;
+        if (remainingActive === 0 && !usage.resident) {
+            usage.checkOutTime = new Date();
+        }
+
+        // KHÔNG update totalAmount hoặc priceAtUsage, giữ nguyên lịch sử
+        await this.serviceUsageRepo.save(usage);
+
+        // Để tránh lỗi render object ở frontend, return format dễ render: additionalGuests là array strings (active names)
+        // Nếu cần lịch sử đầy đủ, có thể add field separate như additionalGuestsHistory
+        const updatedActiveGuests = allGuests.filter(g => g.checkedOutAt === null).map(g => g.name);
+
+        return {
+            ...usage, // Giữ nguyên các field khác
+            additionalGuests: updatedActiveGuests, // Override để return array strings thay vì JSON string
+        };
     }
-
-    usage.additionalGuests = currentGuests.length ? currentGuests.join(',') : null;
-
-    await this.serviceUsageRepo.save(usage);
-
-    return usage;
-}
-
 
     private euclideanDistance(a: number[], b: number[]): number {
         return Math.sqrt(a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0));
@@ -399,6 +412,9 @@ export class CheckInService {
                 (activeUsage.checkOutTime.getTime() - activeUsage.checkInTime.getTime()) / 60000,
             );
 
+            // Parse để hiển thị (dùng all vì đã out)
+            const allGuests = parseGuests(activeUsage.additionalGuests, false);
+
             return {
                 action: 'checkout',
                 message: 'Checkout thành công. Cảm ơn quý cư dân đã sử dụng dịch vụ!',
@@ -407,7 +423,7 @@ export class CheckInService {
                     ? `${resident.apartment.building} - ${resident.apartment.roomNumber}`
                     : null,
                 avatar: resident.avatar,
-                additionalGuests: dto.additionalGuests || [],
+                additionalGuests: allGuests.map(g => g.name) || [],
                 duration_minutes: durationMinutes,
             };
         }
@@ -424,9 +440,9 @@ export class CheckInService {
             checkInTime: new Date(),
             checkOutTime: null,
             method: method,
-            additionalGuests: dto.additionalGuests ? dto.additionalGuests.join(', ') : null,
+            // Lưu JSON
+            additionalGuests: dto.additionalGuests ? JSON.stringify(dto.additionalGuests.map(name => ({ name, checkedOutAt: null }))) : null,
             phone: resident.phone,
-
             priceAtUsage: priceAtUsage,
             totalAmount: totalAmount,
             paymentStatus: 0,
@@ -478,11 +494,20 @@ export class CheckInService {
         }
     }
 }
-function parseGuests(guests?: string | null): string[] {
-    if (!guests) return [];
-    return guests
-        .split(',')
-        .map(g => g.trim())
-        .filter(Boolean);
-}
 
+// Hàm parse cập nhật: Parse JSON, hỗ trợ onlyActive và fallback data cũ
+function parseGuests(guests?: string | null, onlyActive: boolean = true): { name: string, checkedOutAt: Date | null }[] {
+    if (!guests) return [];
+    try {
+        const parsed = JSON.parse(guests);
+        if (!Array.isArray(parsed)) return [];
+        if (onlyActive) {
+            return parsed.filter(g => g.checkedOutAt === null);
+        }
+        return parsed;
+    } catch (e) {
+        // Fallback cho data cũ (comma-separated): Convert sang JSON format
+        const oldGuests = guests.split(',').map(g => g.trim()).filter(Boolean);
+        return oldGuests.map(name => ({ name, checkedOutAt: null }));
+    }
+}
