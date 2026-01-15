@@ -6,7 +6,7 @@ export class FillerHistoryDto {
     @ApiProperty({ required: false })
     @IsOptional()
     @IsString({ message: 'Tên tìm kiếm phải là chuỗi kí tự' })
-    searchName?: string; // Tim theo cu dan
+    search?: string; // Tim theo cu dan
 
     @ApiProperty({ required: false })
     @IsOptional()
